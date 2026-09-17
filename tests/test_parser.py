@@ -611,3 +611,33 @@ voice dyn_voice_var
     assert res.audios[1].is_dynamic
 
 
+def test_layeredimage_statement_parsing():
+    """Test that layeredimage declarations are parsed as ImageDefinitions."""
+    script = """
+layeredimage augustina:
+    always "augustina_base"
+    group outfit:
+        attribute dress default
+"""
+    res = parse_string(script)
+    assert len(res.images) == 1
+    assert res.images[0].name == "augustina"
+    assert not res.images[0].is_dynamic
+
+
+def test_audio_list_parsing():
+    """Test that audio lists in play and queue statements are extracted."""
+    script = """
+play music [ "intro.ogg", "<from 5>loop.ogg" ] fadeout 1.0
+queue sound [ "step1.wav", "step2.wav" ]
+"""
+    res = parse_string(script)
+    assert len(res.audios) == 4
+    assert res.audios[0].target == "intro.ogg"
+    assert res.audios[0].channel == "music"
+    assert res.audios[1].target == "loop.ogg"
+    assert res.audios[1].channel == "music"
+    assert res.audios[2].target == "step1.wav"
+    assert res.audios[2].channel == "sound"
+    assert res.audios[3].target == "step2.wav"
+    assert res.audios[3].channel == "sound"

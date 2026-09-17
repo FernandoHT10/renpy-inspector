@@ -135,7 +135,7 @@ class ProjectValidator:
             for _, _, files in os.walk(directory):
                 for f in files:
                     lower = f.lower()
-                    if lower.endswith(".rpy"):
+                    if lower.endswith((".rpy", "_ren.py")):
                         source_count += 1
                     elif lower.endswith(".rpyc"):
                         compiled_count += 1
@@ -145,11 +145,11 @@ class ProjectValidator:
 
     @classmethod
     def _has_any_script(cls, directory: Path) -> bool:
-        """Recursively check if there are any .rpy or .rpyc files in the directory."""
+        """Recursively check if there are any .rpy, .rpyc, or _ren.py files in the directory."""
         try:
             for root, _, files in os.walk(directory):
                 for f in files:
-                    if f.lower().endswith((".rpy", ".rpyc", ".rpym")):
+                    if f.lower().endswith((".rpy", ".rpyc", ".rpym", "_ren.py")):
                         return True
         except OSError:
             pass

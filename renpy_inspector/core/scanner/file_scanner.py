@@ -8,11 +8,11 @@ from renpy_inspector.core.models.asset import AssetInfo
 from renpy_inspector.core.models.enums import AssetType
 from renpy_inspector.core.scanner.asset_catalog import AssetCatalog
 
-# Extension sets mapped to AssetType
+# Extension sets mapped to AssetType (based on official Ren'Py documentation)
 SCRIPT_EXTENSIONS = {".rpy", ".rpym"}
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif"}
-AUDIO_EXTENSIONS = {".ogg", ".mp3", ".wav", ".opus"}
-FONT_EXTENSIONS = {".ttf", ".otf"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".svg", ".bmp", ".gif"}
+AUDIO_EXTENSIONS = {".ogg", ".mp3", ".wav", ".opus", ".flac", ".mp2"}
+FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2", ".ttc"}
 VIDEO_EXTENSIONS = {".webm", ".ogv", ".mp4", ".mkv", ".avi"}
 
 EXTENSION_MAP: dict[str, AssetType] = {}
@@ -87,12 +87,16 @@ class FileScanner:
                                     dir_stack.append(Path(entry.path))
                             elif entry.is_file(follow_symlinks=False):
                                 ext = Path(entry.name).suffix.lower()
+                                lower_name = entry.name.lower()
 
-                                # Skip .rpym if corresponding .rpy exists in same directory
-                                if ext == ".rpym" and entry.name[:-5].lower() in rpy_stems:
-                                    continue
-
-                                asset_type = EXTENSION_MAP.get(ext)
+                                if lower_name.endswith("_ren.py"):
+                                    asset_type = AssetType.SCRIPT
+                                    ext = "_ren.py"
+                                else:
+                                    # Skip .rpym if corresponding .rpy exists in same directory
+                                    if ext == ".rpym" and entry.name[:-5].lower() in rpy_stems:
+                                        continue
+                                    asset_type = EXTENSION_MAP.get(ext)
 
                                 if asset_type is not None:
                                     entry_path = Path(entry.path)

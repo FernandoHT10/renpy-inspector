@@ -31,9 +31,14 @@ RE_JUMP = re.compile(r"^jump\s+(.+)$", re.UNICODE)
 RE_CALL = re.compile(r"^call\s+(.+)$", re.UNICODE)
 RE_IMAGE_EQUAL = re.compile(r"^image\s+([^=]+)=\s*(.+)$", re.UNICODE)
 RE_IMAGE_ATL = re.compile(r"^image\s+([^:]+):$", re.UNICODE)
+RE_LAYEREDIMAGE = re.compile(r"^layeredimage\s+([^:]+):$", re.UNICODE)
 RE_AUDIO_QUOTED = re.compile(
     r"^(play|queue)\s+([\w]+)\s+(\"[^\"]*\"|'[^']*')(.*)$", re.UNICODE
 )
+RE_AUDIO_LIST = re.compile(
+    r"^(play|queue)\s+([\w]+)\s+\[([^\]]+)\](.*)$", re.UNICODE
+)
+RE_QUOTED_ITEM = re.compile(r"(\"[^\"]*\"|'[^']*')", re.UNICODE)
 RE_AUDIO_DYNAMIC = re.compile(
     r"^(play|queue)\s+([\w]+)\s+([\w\.]+)(.*)$", re.UNICODE
 )
@@ -150,7 +155,7 @@ class RpyParser:
                 if not code.startswith((
                     "label", "screen", "jump", "call", "image", "play", "queue",
                     "define", "default", "translate", "scene", "show", "hide",
-                    "init", "python", "$", "menu", "voice"
+                    "init", "python", "$", "menu", "voice", "layeredimage"
                 )) and "register_channel" not in code:
                     continue
 
@@ -374,7 +379,70 @@ class RpyParser:
                     )
                     continue
 
+                if code.startswith("layeredimage "):
+                    m_lay = RE_LAYEREDIMAGE.match(code)
+                    if m_lay:
+                        img_name = m_lay.group(1).strip()
+                        result.images.append(
+                            ImageDefinition(
+                                name=img_name,
+                                location=Location(
+                                    file_path=line.file_path,
+                                    line_number=line.line_number,
+                                    column_number=line.column,
+                                    source_snippet=line.raw_text.strip(),
+                                ),
+                                asset_reference=None,
+                                is_dynamic=False,
+                            )
+                        )
+                        continue
+
                 # 8. Audio (play / queue / voice)
+                m_audio_list = RE_AUDIO_LIST.match(code)
+                if m_audio_list:
+                    action = m_audio_list.group(1)
+                    channel = m_audio_list.group(2)
+                    list_body = m_audio_list.group(3)
+                    quoted_items = RE_QUOTED_ITEM.findall(list_body)
+                    if quoted_items:
+                        for raw_path in quoted_items:
+                            unquoted_audio = unquote_string(raw_path) or raw_path
+                            clean_audio = RE_AUDIO_CLAUSE.sub("", unquoted_audio)
+                            result.audios.append(
+                                AudioReference(
+                                    channel=channel,
+                                    target=clean_audio,
+                                    action=action,
+                                    location=Location(
+                                        file_path=line.file_path,
+                                        line_number=line.line_number,
+                                        column_number=line.column,
+                                        source_snippet=line.raw_text.strip(),
+                                    ),
+                                    kind=ReferenceKind.STATIC,
+                                )
+                            )
+                    else:
+                        for raw_item in list_body.split(","):
+                            dyn_target = raw_item.strip()
+                            if dyn_target:
+                                result.audios.append(
+                                    AudioReference(
+                                        channel=channel,
+                                        target=dyn_target,
+                                        action=action,
+                                        location=Location(
+                                            file_path=line.file_path,
+                                            line_number=line.line_number,
+                                            column_number=line.column,
+                                            source_snippet=line.raw_text.strip(),
+                                        ),
+                                        kind=ReferenceKind.DYNAMIC,
+                                    )
+                                )
+                    continue
+
                 m_audio_q = RE_AUDIO_QUOTED.match(code)
                 if m_audio_q:
                     action = m_audio_q.group(1)

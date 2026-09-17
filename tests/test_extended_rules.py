@@ -115,6 +115,7 @@ def test_shadow_builtin_rule():
             VariableDeclaration(name="my_flag", kind="default", location=loc),  # User var OK
             VariableDeclaration(name="renpy", kind="define", location=loc),  # Dangerous shadow!
             VariableDeclaration(name="store", kind="default", location=loc),  # Dangerous shadow!
+            VariableDeclaration(name="gui", kind="define", location=loc),  # Dangerous shadow!
         ],
     )
 
@@ -122,12 +123,44 @@ def test_shadow_builtin_rule():
     rule = ShadowBuiltinRule()
     issues = rule.analyze(ctx)
 
-    assert len(issues) == 2
+    assert len(issues) == 3
     rule_ids = [i.rule_id for i in issues]
     assert all(rid == "RPY-CODE-006" for rid in rule_ids)
     names = [i.title for i in issues]
     assert any("renpy" in n for n in names)
     assert any("store" in n for n in names)
+    assert any("gui" in n for n in names)
+    gui_issue = next(i for i in issues if "gui" in i.title)
+    assert gui_issue.severity == Severity.CRITICAL
+
+
+def test_official_lifecycle_labels_and_screens_accepted():
+    """Verify that official Ren'Py lifecycle hooks and screens are not flagged
+    as unused or missing."""
+    from renpy_inspector.core.models.symbols import CallReference, LabelSymbol
+
+    loc = Location(file_path="game/script.rpy", line_number=1)
+    f1 = FileParseResult(
+        file_path="game/script.rpy",
+        labels=[
+            LabelSymbol(name="before_load", location=loc),
+            LabelSymbol(name="after_warp", location=loc),
+            LabelSymbol(name="hide_windows", location=loc),
+        ],
+        calls=[
+            CallReference(target="skip_indicator", location=loc, is_screen=True),
+            CallReference(target="bubble", location=loc, is_screen=True),
+            CallReference(target="ctc", location=loc, is_screen=True),
+            CallReference(target="yesno_prompt", location=loc, is_screen=True),
+        ],
+    )
+
+    ctx = make_dummy_context([f1])
+    label_rule = UnusedLabelRule()
+    screen_rule = UndefinedScreenRule()
+
+    assert len(label_rule.analyze(ctx)) == 0
+    assert len(screen_rule.analyze(ctx)) == 0
 
 
 def test_custom_registered_channel_accepted():

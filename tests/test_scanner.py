@@ -14,6 +14,7 @@ def test_scanner_detects_all_supported_types(tmp_path: Path):
     # Scripts
     (game_dir / "script.rpy").write_text("label start: pass", encoding="utf-8")
     (game_dir / "module.rpym").write_text("# module", encoding="utf-8")
+    (game_dir / "logic_ren.py").write_text("# renpy in python", encoding="utf-8")
 
     # Images
     images_dir = game_dir / "images"
@@ -24,6 +25,8 @@ def test_scanner_detects_all_supported_types(tmp_path: Path):
     (images_dir / "img4.webp").write_bytes(b"RIFF")
     (images_dir / "img5.bmp").write_bytes(b"BM")
     (images_dir / "img6.gif").write_bytes(b"GIF89a")
+    (images_dir / "img7.avif").write_bytes(b"ftypavif")
+    (images_dir / "img8.svg").write_bytes(b"<svg></svg>")
 
     # Audio
     audio_dir = game_dir / "audio"
@@ -32,12 +35,17 @@ def test_scanner_detects_all_supported_types(tmp_path: Path):
     (audio_dir / "track.mp3").write_bytes(b"ID3")
     (audio_dir / "track.wav").write_bytes(b"RIFF")
     (audio_dir / "track.opus").write_bytes(b"OggS")
+    (audio_dir / "track.flac").write_bytes(b"fLaC")
+    (audio_dir / "track.mp2").write_bytes(b"\xff\xf4")
 
     # Fonts
     fonts_dir = game_dir / "fonts"
     fonts_dir.mkdir()
     (fonts_dir / "font1.ttf").write_bytes(b"\x00\x01\x00\x00")
     (fonts_dir / "font2.otf").write_bytes(b"OTTO")
+    (fonts_dir / "font3.woff").write_bytes(b"wOFF")
+    (fonts_dir / "font4.woff2").write_bytes(b"wOF2")
+    (fonts_dir / "font5.ttc").write_bytes(b"ttcf")
 
     # Unknown extensions to be ignored
     (game_dir / "readme.txt").write_text("Hello", encoding="utf-8")
@@ -48,11 +56,11 @@ def test_scanner_detects_all_supported_types(tmp_path: Path):
     catalog = scanner.scan(game_dir)
 
     counts = catalog.count_by_type()
-    assert counts[AssetType.SCRIPT] == 2
-    assert counts[AssetType.IMAGE] == 6
-    assert counts[AssetType.AUDIO] == 4
-    assert counts[AssetType.FONT] == 2
-    assert catalog.total_count() == 14
+    assert counts[AssetType.SCRIPT] == 3
+    assert counts[AssetType.IMAGE] == 8
+    assert counts[AssetType.AUDIO] == 6
+    assert counts[AssetType.FONT] == 5
+    assert catalog.total_count() == 22
 
     # Verify unknown files are NOT in catalog
     assert "readme.txt" not in catalog

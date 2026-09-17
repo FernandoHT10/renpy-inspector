@@ -11,16 +11,19 @@ RESERVED_RENPY_NAMES = frozenset(
     {
         "renpy",
         "config",
+        "gui",
         "persistent",
         "preferences",
         "store",
         "ui",
         "theme",
         "style",
-        "main_menu",
         "_preferences",
         "_window",
         "_rollback",
+        "_confirm_quit",
+        "_game_menu_screen",
+        "_history",
     }
 )
 
@@ -42,7 +45,8 @@ class ShadowBuiltinRule(Rule):
         for var in context.all_variables:
             # If user defines the exact reserved root name rather than config.name
             if var.name in RESERVED_RENPY_NAMES:
-                sev = Severity.CRITICAL if var.name in {"renpy", "store"} else Severity.WARNING
+                is_crit = var.name in {"renpy", "store", "gui"}
+                sev = Severity.CRITICAL if is_crit else Severity.WARNING
                 issues.append(
                     Issue.create(
                         rule_id=self.rule_id,

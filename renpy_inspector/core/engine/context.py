@@ -23,18 +23,27 @@ from renpy_inspector.core.models.symbols import (
 from renpy_inspector.core.parser.result import ParsedProject
 from renpy_inspector.core.scanner.asset_catalog import AssetCatalog
 
-# Ren'Py built-in special lifecycle labels
+# Ren'Py built-in special lifecycle labels (from official Ren'Py documentation)
 BUILTIN_RENPY_LABELS = frozenset(
     {
         "start",
         "quit",
         "main_menu",
         "after_load",
+        "before_load",
         "splashscreen",
         "before_main_menu",
+        "after_warp",
+        "hide_windows",
+        "main_menu_screen",
+        "load_screen",
+        "save_screen",
+        "preferences_screen",
+        "joystick_preferences_screen",
     }
 )
 
+# Ren'Py built-in special and conventional screens (from official Ren'Py documentation)
 BUILTIN_RENPY_SCREENS = frozenset(
     {
         "say",
@@ -48,15 +57,20 @@ BUILTIN_RENPY_SCREENS = frozenset(
         "history",
         "help",
         "confirm",
+        "yesno_prompt",
         "input",
         "notify",
         "quick_menu",
         "nvl",
+        "nvl_choice",
         "game_menu",
         "about",
         "keyboard_help",
         "mouse_help",
         "gamepad_help",
+        "skip_indicator",
+        "ctc",
+        "bubble",
     }
 )
 
