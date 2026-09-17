@@ -33,3 +33,35 @@ def test_cli_invalid_project(tmp_path: Path, capsys):
     assert "Ren'Py Inspector" in captured
     assert "Status: INVALID" in captured
     assert "Errors:" in captured
+
+
+def test_cli_severity_and_category_filter(valid_minimal_project_dir: Path, capsys):
+    """CLI should filter displayed issues by severity and category."""
+    exit_code = main([
+        str(valid_minimal_project_dir),
+        "--severity", "ERROR",
+        "--category", "Code",
+    ])
+    captured = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Inspection Results:" in captured
+
+
+def test_cli_export_options(valid_minimal_project_dir: Path, tmp_path: Path, capsys):
+    """CLI should export HTML and JSON reports when requested."""
+    html_out = tmp_path / "report.html"
+    json_out = tmp_path / "report.json"
+
+    exit_code = main([
+        str(valid_minimal_project_dir),
+        "--export-html", str(html_out),
+        "--export-json", str(json_out),
+    ])
+    captured = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert html_out.is_file()
+    assert json_out.is_file()
+    assert "HTML report exported to:" in captured
+    assert "JSON report exported to:" in captured
+

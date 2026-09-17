@@ -33,7 +33,10 @@ python -m renpy_inspector --gui "C:/Juegos/MiProyectoRenpy"
 ### 1.3 Herramienta de Línea de Comandos (CLI)
 Ideal para integración continua, terminales de desarrollo y scripts de automatización:
 ```bash
-# Inspección estándar de un proyecto
+# Opción 1: Mediante el comando directo de consola
+renpy-inspector "C:/Juegos/MiProyectoRenpy"
+
+# Opción 2: Mediante el comando de módulo Python
 python -m renpy_inspector "C:/Juegos/MiProyectoRenpy"
 ```
 
@@ -95,23 +98,31 @@ En la esquina superior derecha, dispones de dos botones de exportación:
 
 ## 3. Uso desde la Línea de Comandos (CLI)
 
-Ren'Py Inspector cuenta con una interfaz CLI robusta para terminales (PowerShell, Bash, Zsh) y scripts de automatización:
+Ren'Py Inspector cuenta con una interfaz CLI rápida y robusta para terminales (PowerShell, Bash, Zsh) y scripts de automatización:
 
 ### Comandos Frecuentes
 ```bash
 # Inspección estándar de un proyecto
-python -m renpy_inspector "C:/Juegos/MiProyectoRenpy"
+renpy-inspector "C:/Juegos/MiProyectoRenpy"
 
 # Mostrar incidencias de nivel INFO (assets sin uso en disco, etc.)
-python -m renpy_inspector "C:/Juegos/MiProyectoRenpy" --show-info
+renpy-inspector "C:/Juegos/MiProyectoRenpy" --show-info
 
-# Generar ambos reportes de forma desatendida
-python -m renpy_inspector "C:/Juegos/MiProyectoRenpy" --export-html "reports/qa.html" --export-json "reports/qa.json"
+# Filtrar por severidad mínima (CRITICAL, ERROR, WARNING, INFO)
+renpy-inspector "C:/Juegos/MiProyectoRenpy" --severity ERROR
+
+# Filtrar por categoría específica (Code, Assets, Translation, etc.)
+renpy-inspector "C:/Juegos/MiProyectoRenpy" --category Code
+
+# Generar ambos reportes de forma desatendida (HTML interactivo y JSON estructurado)
+renpy-inspector "C:/Juegos/MiProyectoRenpy" --export-html "reports/qa.html" --export-json "reports/qa.json"
 ```
 
+> **Nota de compatibilidad**: Todos los comandos admiten indistintamente tanto el ejecutable directo `renpy-inspector` como la sintaxis `python -m renpy_inspector`.
+
 ### Códigos de Salida (Exit Codes para CI/CD)
-* `0`: El proyecto está limpio y no contiene errores de severidad `ERROR` ni `CRITICAL`.
-* `1`: El proyecto contiene uno o más errores críticos, o la ruta especificada no es un proyecto Ren'Py válido.
+* `0`: El proyecto está limpio y no contiene problemas que alcancen el umbral de severidad establecido.
+* `1`: El proyecto contiene uno o más errores de severidad `ERROR` o `CRITICAL` (o problemas que superen el umbral `--severity`), o la ruta especificada no es un proyecto Ren'Py válido.
 
 ---
 

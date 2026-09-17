@@ -45,6 +45,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         help="Display INFO severity issues (such as potentially unused assets)",
     )
     parser.add_argument(
+        "--severity",
+        type=str,
+        default=None,
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "critical", "error", "warning", "info"],
+        help="Filter displayed issues by minimum severity threshold",
+    )
+    parser.add_argument(
+        "--category",
+        type=str,
+        default=None,
+        help="Filter displayed issues by category (e.g. Code, Assets, Translation)",
+    )
+    parser.add_argument(
         "--export-json",
         type=str,
         default=None,
@@ -159,8 +172,34 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     print(f"  INFO:     {info_count}")
     print()
 
-    # Filter issues for terminal display: hide INFO by default unless --show-info passed
-    displayed_issues = [i for i in issues if i.severity != Severity.INFO or args.show_info]
+    SEVERITY_RANK = {
+        Severity.INFO: 0,
+        Severity.WARNING: 1,
+        Severity.ERROR: 2,
+        Severity.CRITICAL: 3,
+    }
+
+    # Minimum severity: WARNING by default, unless --show-info or --severity is passed
+    min_rank = 1
+    if args.severity:
+        try:
+            target_sev = Severity(args.severity.upper())
+            min_rank = SEVERITY_RANK[target_sev]
+        except ValueError:
+            min_rank = 1
+    elif args.show_info:
+        min_rank = 0
+
+    category_filter = args.category.strip().lower() if args.category else None
+
+    # Filter issues for terminal display
+    displayed_issues = []
+    for issue in issues:
+        if SEVERITY_RANK.get(issue.severity, 0) < min_rank:
+            continue
+        if category_filter and category_filter not in issue.category.value.lower():
+            continue
+        displayed_issues.append(issue)
 
     if displayed_issues:
         print("Detected Issues:")
@@ -171,9 +210,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"  Message: {issue.message}")
             print(f"  Suggestion: {issue.suggestion}")
             print()
-    elif issues and not args.show_info:
-        print(f"({info_count} INFO issues hidden. Use --show-info to display them.)")
-        print()
+    elif issues and min_rank > 0:
+        hidden_count = sum(1 for i in issues if SEVERITY_RANK.get(i.severity, 0) < min_rank)
+        if hidden_count > 0:
+            print(
+                f"({hidden_count} issues hidden by severity filter. "
+                "Use --show-info or --severity to display.)"
+            )
+            print()
 
     if validation.warnings:
         print("Notices:")
@@ -201,6 +245,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"HTML report exported to: {out_html}")
 
     print("Scan and QA inspection completed successfully.")
+    if args.severity:
+        has_failing = any(SEVERITY_RANK.get(i.severity, 0) >= min_rank for i in issues)
+        return 1 if has_failing else 0
+
     return 0 if (critical_count == 0 and error_count == 0) else 1
 
 
