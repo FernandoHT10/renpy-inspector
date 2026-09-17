@@ -1,6 +1,6 @@
 # Ren'Py Inspector
 
-> 🌐 **Language / Idioma**: [English](README.md) • [Español](README.es.md)
+> 🌐 **Language**: [English](README.md) • [Español](README.es.md)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![GUI: PySide6](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-success.svg)](https://wiki.qt.io/Qt_for_Python)
