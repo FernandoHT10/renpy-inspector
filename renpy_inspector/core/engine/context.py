@@ -1,5 +1,6 @@
 """Context model holding cross-referenced project symbols and asset indices."""
 
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -226,6 +227,7 @@ class ProjectContext:
     def resolve_audio_asset(self, audio_target: str) -> Optional[AssetInfo]:
         """Resolve audio path looking in game/ and game/audio/ with case tolerance."""
         clean_target = audio_target.strip("\"'").replace("\\", "/")
+        clean_target = re.sub(r"^(<[^>]+>\s*)+", "", clean_target)
 
         # 1. Check exact path in game/
         asset = self.catalog.find_exact(clean_target)

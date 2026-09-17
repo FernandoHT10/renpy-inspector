@@ -23,6 +23,14 @@ class UnusedAssetCandidateRule(BaseRule):
     def analyze(self, context: ProjectContext) -> list[Issue]:
         issues: list[Issue] = []
 
+        # Do not flag assets as unused if no .rpy source files were parsed
+        # (e.g. in compiled distributions containing only .rpyc files or SDK translation stubs)
+        has_rpy_sources = any(
+            f.lower().endswith(".rpy") for f in context.parsed_project.files.keys()
+        )
+        if not has_rpy_sources:
+            return issues
+
         # Collect all reference strings/tokens in a unified lookup set
         token_pool = context.script_token_pool
 

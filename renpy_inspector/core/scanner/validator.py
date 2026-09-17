@@ -109,6 +109,14 @@ class ProjectValidator:
                 "No 'script.rpy' detected in game/ folder (scripts may be organized in subfolders)."
             )
 
+        # Check if project contains only compiled .rpyc files without .rpy source files
+        source_count, compiled_count = cls._count_scripts(game_path)
+        if source_count == 0 and compiled_count > 0:
+            warnings.append(
+                f"Project contains {compiled_count} compiled scripts (.rpyc) but no .rpy sources. "
+                "Static QA inspection requires .rpy source files to inspect narrative code."
+            )
+
         return ValidationResult(
             is_valid=True,
             root_path=root_path,
@@ -117,6 +125,23 @@ class ProjectValidator:
             warnings=tuple(warnings),
             errors=(),
         )
+
+    @classmethod
+    def _count_scripts(cls, directory: Path) -> tuple[int, int]:
+        """Count (source_scripts, compiled_scripts) recursively in the directory."""
+        source_count = 0
+        compiled_count = 0
+        try:
+            for _, _, files in os.walk(directory):
+                for f in files:
+                    lower = f.lower()
+                    if lower.endswith(".rpy"):
+                        source_count += 1
+                    elif lower.endswith(".rpyc"):
+                        compiled_count += 1
+        except OSError:
+            pass
+        return source_count, compiled_count
 
     @classmethod
     def _has_any_script(cls, directory: Path) -> bool:

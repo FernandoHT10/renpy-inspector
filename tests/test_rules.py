@@ -7,8 +7,11 @@ from renpy_inspector.core.engine.registry import RuleRegistry
 from renpy_inspector.core.engine.runner import RuleRunner
 from renpy_inspector.core.models.asset import AssetInfo
 from renpy_inspector.core.models.enums import AssetType, Category, Confidence, Severity
+from renpy_inspector.core.models.location import Location
 from renpy_inspector.core.models.project import RenPyProject
+from renpy_inspector.core.models.symbols import AudioReference
 from renpy_inspector.core.parser.project_parser import ProjectParser
+from renpy_inspector.core.parser.result import FileParseResult, ParsedProject
 from renpy_inspector.core.rules.assets.case_mismatch import CaseMismatchRule
 from renpy_inspector.core.rules.assets.missing_audio import MissingAudioRule
 from renpy_inspector.core.rules.assets.missing_font import MissingFontRule
@@ -349,3 +352,68 @@ label start:
     issues2 = runner.run(ctx, progress_callback=progress)
     assert any(i.rule_id == "RPY-CODE-001" for i in issues2)
     assert len(progress_reported) == len(registry.get_all_rules())
+
+
+def test_unused_asset_candidate_rule_skipped_when_no_scripts(tmp_path: Path):
+    """When a project has 0 parsed scripts (compiled-only), do not emit unused asset warnings."""
+    game_dir = tmp_path / "game"
+    game_dir.mkdir(parents=True)
+    asset_img = AssetInfo(
+        relative_path="images/bg.png",
+        absolute_path=game_dir / "images" / "bg.png",
+        asset_type=AssetType.IMAGE,
+        filename="bg.png",
+        extension=".png",
+        size_bytes=5000,
+    )
+    catalog = AssetCatalog([asset_img])
+    project = RenPyProject(name="CompiledOnly", root_path=tmp_path, game_path=game_dir)
+    parsed = ParsedProject(files={})  # 0 parsed scripts
+
+    ctx = ProjectContext.build(project=project, catalog=catalog, parsed_project=parsed)
+    rule = UnusedAssetCandidateRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 0
+
+    # Also skipped if only translation/module stubs (.rpym) exist without .rpy source files
+    file_result = FileParseResult(file_path="game/tl/None/common.rpym")
+    parsed_rpym = ParsedProject(files={"game/tl/None/common.rpym": file_result})
+    ctx_rpym = ProjectContext.build(project=project, catalog=catalog, parsed_project=parsed_rpym)
+    issues_rpym = rule.analyze(ctx_rpym)
+    assert len(issues_rpym) == 0
+
+
+def test_missing_audio_rule_with_playback_clauses(tmp_path: Path):
+    """Audio references with <from 0 to 80> clauses must resolve without false positives."""
+    game_dir = tmp_path / "game"
+    game_dir.mkdir(parents=True)
+    audio_dir = game_dir / "audio"
+    audio_dir.mkdir()
+    (audio_dir / "intro.ogg").write_bytes(b"OGG_HEADER")
+
+    asset_audio = AssetInfo(
+        relative_path="audio/intro.ogg",
+        absolute_path=audio_dir / "intro.ogg",
+        asset_type=AssetType.AUDIO,
+        filename="intro.ogg",
+        extension=".ogg",
+        size_bytes=10,
+    )
+    catalog = AssetCatalog([asset_audio])
+    project = RenPyProject(name="AudioTest", root_path=tmp_path, game_path=game_dir)
+
+    loc = Location(file_path="game/script.rpy", line_number=10)
+    ref = AudioReference(
+        channel="music",
+        target="<from 0 to 80>audio/intro.ogg",
+        action="play",
+        location=loc,
+    )
+    file_result = FileParseResult(file_path="game/script.rpy", audios=[ref])
+    parsed = ParsedProject(files={"game/script.rpy": file_result})
+
+    ctx = ProjectContext.build(project=project, catalog=catalog, parsed_project=parsed)
+    rule = MissingAudioRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 0
+

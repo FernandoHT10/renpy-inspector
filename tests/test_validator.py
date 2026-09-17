@@ -95,3 +95,18 @@ def test_validator_scripts_in_subfolders(tmp_path: Path):
     res = ProjectValidator.validate(project_dir)
     assert res.is_valid
     assert len(res.errors) == 0
+
+
+def test_validator_detects_compiled_only_project(tmp_path: Path):
+    """A project containing only .rpyc files is valid but issues a warning
+    about missing .rpy source files."""
+    project_dir = tmp_path / "compiled_project"
+    game_dir = project_dir / "game"
+    game_dir.mkdir(parents=True)
+    (game_dir / "script.rpyc").write_bytes(b"RPYC_BYTECODE")
+
+    res = ProjectValidator.validate(project_dir)
+    assert res.is_valid
+    assert len(res.errors) == 0
+    assert any("compiled scripts (.rpyc) but no .rpy sources" in w for w in res.warnings)
+

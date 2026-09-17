@@ -566,3 +566,48 @@ label demo_transitions:
     assert res.jumps[0].target == "demo_transitions_menu"
 
 
+def test_label_with_nested_parameter_calls():
+    """Test labels with nested function call parameters such as Fade(1, 0, 1)."""
+    script = """
+label get_scene(cur_scene, trans=Fade(1, 0, 1)):
+    return
+"""
+    res = parse_string(script)
+    assert len(res.labels) == 1
+    assert res.labels[0].name == "get_scene"
+    assert "Fade(1, 0, 1)" in (res.labels[0].params or "")
+
+
+def test_audio_with_playback_clauses():
+    """Test that Ren'Py audio playback clauses like <from 0 to 80> are stripped from path."""
+    script = """
+play music "<from 0 to 80>audio/bgm/theme.ogg"
+play sound "<loop 13>audio/sfx/click.ogg"
+queue music "<to 2.5>audio/bgm/ending.ogg"
+"""
+    res = parse_string(script)
+    assert len(res.audios) == 3
+    assert res.audios[0].target == "audio/bgm/theme.ogg"
+    assert res.audios[0].channel == "music"
+    assert res.audios[1].target == "audio/sfx/click.ogg"
+    assert res.audios[1].channel == "sound"
+    assert res.audios[2].target == "audio/bgm/ending.ogg"
+    assert res.audios[2].channel == "music"
+
+
+def test_voice_statement_parsing():
+    """Test that Ren'Py voice statements are parsed as audio references on 'voice' channel."""
+    script = """
+voice "audio/voice/line01.ogg"
+voice dyn_voice_var
+"""
+    res = parse_string(script)
+    assert len(res.audios) == 2
+    assert res.audios[0].channel == "voice"
+    assert res.audios[0].target == "audio/voice/line01.ogg"
+    assert res.audios[0].action == "voice"
+    assert res.audios[1].channel == "voice"
+    assert res.audios[1].target == "dyn_voice_var"
+    assert res.audios[1].is_dynamic
+
+

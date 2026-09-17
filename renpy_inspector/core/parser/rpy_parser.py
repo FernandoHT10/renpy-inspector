@@ -24,8 +24,8 @@ from renpy_inspector.core.parser.result import FileParseResult
 from renpy_inspector.core.parser.source import SourceFile, SourceLoader
 
 # Regex patterns for Ren'Py statements (using Unicode-aware word matching)
-RE_LABEL = re.compile(r"^label\s+([\w\.]+)(\s*\([^)]*\))?\s*:$", re.UNICODE)
-RE_MENU = re.compile(r"^menu\s+([\w\.]+)(\s*\([^)]*\))?\s*:$", re.UNICODE)
+RE_LABEL = re.compile(r"^label\s+([\w\.]+)(?:\s*\((.*)\))?\s*:$", re.UNICODE)
+RE_MENU = re.compile(r"^menu\s+([\w\.]+)(?:\s*\((.*)\))?\s*:$", re.UNICODE)
 RE_SCREEN = re.compile(r"^screen\s+([\w\.]+)(?:\s*\((.*)\))?.*:$", re.UNICODE)
 RE_JUMP = re.compile(r"^jump\s+(.+)$", re.UNICODE)
 RE_CALL = re.compile(r"^call\s+(.+)$", re.UNICODE)
@@ -37,6 +37,13 @@ RE_AUDIO_QUOTED = re.compile(
 RE_AUDIO_DYNAMIC = re.compile(
     r"^(play|queue)\s+([\w]+)\s+([\w\.]+)(.*)$", re.UNICODE
 )
+RE_VOICE_QUOTED = re.compile(
+    r"^voice\s+(\"[^\"]*\"|'[^']*')(.*)$", re.UNICODE
+)
+RE_VOICE_DYNAMIC = re.compile(
+    r"^voice\s+([\w\.]+)(.*)$", re.UNICODE
+)
+RE_AUDIO_CLAUSE = re.compile(r"^(<[^>]+>\s*)+")
 RE_DEFINE_DEFAULT = re.compile(
     r"^(define|default)(\s+-?\d+)?\s+([\w\.]+)\s*=\s*(.*)$", re.UNICODE
 )
@@ -143,7 +150,7 @@ class RpyParser:
                 if not code.startswith((
                     "label", "screen", "jump", "call", "image", "play", "queue",
                     "define", "default", "translate", "scene", "show", "hide",
-                    "init", "python", "$", "menu"
+                    "init", "python", "$", "menu", "voice"
                 )) and "register_channel" not in code:
                     continue
 
@@ -200,7 +207,7 @@ class RpyParser:
                                 ),
                                 is_local=is_local,
                                 parent_label=parent_lbl,
-                                params=params.strip("()") if params else None,
+                                params=params.strip() if params else None,
                             )
                         )
                         continue
@@ -221,7 +228,7 @@ class RpyParser:
                                     column_number=line.column,
                                     source_snippet=line.raw_text.strip(),
                                 ),
-                                params=params.strip("()") if params else None,
+                                params=params.strip() if params else None,
                             )
                         )
                         continue
@@ -367,17 +374,18 @@ class RpyParser:
                     )
                     continue
 
-                # 8. Audio (play / queue)
+                # 8. Audio (play / queue / voice)
                 m_audio_q = RE_AUDIO_QUOTED.match(code)
                 if m_audio_q:
                     action = m_audio_q.group(1)
                     channel = m_audio_q.group(2)
                     raw_path = m_audio_q.group(3)
                     unquoted_audio = unquote_string(raw_path) or raw_path
+                    clean_audio = RE_AUDIO_CLAUSE.sub("", unquoted_audio)
                     result.audios.append(
                         AudioReference(
                             channel=channel,
-                            target=unquoted_audio,
+                            target=clean_audio,
                             action=action,
                             location=Location(
                                 file_path=line.file_path,
@@ -400,6 +408,46 @@ class RpyParser:
                             channel=channel,
                             target=dyn_target,
                             action=action,
+                            location=Location(
+                                file_path=line.file_path,
+                                line_number=line.line_number,
+                                column_number=line.column,
+                                source_snippet=line.raw_text.strip(),
+                            ),
+                            kind=ReferenceKind.DYNAMIC,
+                        )
+                    )
+                    continue
+
+                m_voice_q = RE_VOICE_QUOTED.match(code)
+                if m_voice_q:
+                    raw_path = m_voice_q.group(1)
+                    unquoted_voice = unquote_string(raw_path) or raw_path
+                    clean_voice = RE_AUDIO_CLAUSE.sub("", unquoted_voice)
+                    result.audios.append(
+                        AudioReference(
+                            channel="voice",
+                            target=clean_voice,
+                            action="voice",
+                            location=Location(
+                                file_path=line.file_path,
+                                line_number=line.line_number,
+                                column_number=line.column,
+                                source_snippet=line.raw_text.strip(),
+                            ),
+                            kind=ReferenceKind.STATIC,
+                        )
+                    )
+                    continue
+
+                m_voice_dyn = RE_VOICE_DYNAMIC.match(code)
+                if m_voice_dyn:
+                    dyn_target = m_voice_dyn.group(1)
+                    result.audios.append(
+                        AudioReference(
+                            channel="voice",
+                            target=dyn_target,
+                            action="voice",
                             location=Location(
                                 file_path=line.file_path,
                                 line_number=line.line_number,
