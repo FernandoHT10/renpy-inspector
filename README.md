@@ -10,6 +10,7 @@
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Platform: Windows | Linux | macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](LICENSE)
+[![Security Policy](https://img.shields.io/badge/security-policy-informational.svg)](SECURITY.md)
 
 **Ren'Py Inspector** is an enterprise-grade desktop GUI and CLI static analysis, quality assurance (QA), and continuous auditing platform engineered specifically for visual novel developers and studios building on the [Ren'Py](https://www.renpy.org/) engine.
 

@@ -10,6 +10,7 @@
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Platform: Windows | Linux | macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](../LICENSE)
+[![Política de Seguridad](https://img.shields.io/badge/seguridad-pol%C3%ADtica-informational.svg)](../SECURITY.md)
 
 **Ren'Py Inspector** es una plataforma profesional de escritorio y CLI para análisis estático, aseguramiento de calidad (QA) y auditoría continua diseñada específicamente para desarrolladores y estudios de novelas visuales sobre el motor [Ren'Py](https://www.renpy.org/).
 
