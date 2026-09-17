@@ -1,265 +1,269 @@
 # Ren'Py Inspector
 
+> 🌐 **Language / Idioma**: [English](README.md) • [Español](README.es.md)
+
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![GUI: PySide6](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-success.svg)](https://wiki.qt.io/Qt_for_Python)
 [![Static Analysis](https://img.shields.io/badge/analysis-100%25%20Static%20%26%20Safe-brightgreen.svg)]()
 [![Rules: 20 Core](https://img.shields.io/badge/rules-20%20Core%20Rules-blueviolet.svg)]()
-[![Tests: 111 Passed](https://img.shields.io/badge/tests-111%20passing%20(100%25)-brightgreen.svg)]()
+[![Tests: 113 Passed](https://img.shields.io/badge/tests-113%20passing%20(100%25)-brightgreen.svg)]()
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Platform: Windows | Linux | macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![License: Commercial](https://img.shields.io/badge/license-Commercial-informational.svg)]()
 
-**Ren'Py Inspector** es una plataforma profesional de escritorio y CLI para análisis estático, aseguramiento de calidad (QA) y auditoría continua diseñada específicamente para desarrolladores y estudios de novelas visuales sobre el motor [Ren'Py](https://www.renpy.org/).
+**Ren'Py Inspector** is an enterprise-grade desktop GUI and CLI static analysis, quality assurance (QA), and continuous auditing platform engineered specifically for visual novel developers and studios building on the [Ren'Py](https://www.renpy.org/) engine.
 
-Permite validar proyectos de cualquier escala para detectar saltos narrativos rotos, assets faltantes o huérfanos, inconsistencias de mayúsculas/minúsculas entre sistemas operativos (Linux/Steam Deck/Mac vs Windows), variables mutables mal definidas, errores de persistencia, menús vacíos, código inalcanzable, pantallas duplicadas y etiquetas de diálogo sin cerrar **antes de compilar o distribuir el juego**.
+It thoroughly validates Ren'Py projects of any scale to detect broken narrative jumps, missing or orphaned assets, cross-platform casing mismatches (Linux/Steam Deck/macOS vs. Windows), conflicting define/default declarations, fatal persistence bugs, empty menu choices, unreachable dead code, duplicate screens, and unclosed text dialogue formatting tags **before compiling or publishing the game**.
 
----
-
-## 1. Principios de Arquitectura y Seguridad
-
-* **100% Estático y Seguro**: Trata el código del juego analizado como **datos no confiables** (`SCAN → ANALYZE → REPORT`). Jamás ejecuta `eval()`, `exec()`, `compile()`, ni importa scripts `.rpy` o módulos de Python del usuario en runtime.
-* **Cero Modificación de Código**: Opera bajo el principio estricto de solo lectura. No altera, modifica ni reescribe ningún archivo del proyecto.
-* **Totalmente Local y Offline**: No requiere conexión a internet ni telemetría. La totalidad del código, assets y metadatos se procesa localmente en la máquina del desarrollador, protegiendo la confidencialidad de la propiedad intelectual.
-* **Alto Rendimiento Determinista**: Parser léxico-sintáctico optimizado en Python puro, capaz de escanear y analizar proyectos masivos con más de 2,000 scripts `.rpy` y decenas de miles de assets en menos de 22 segundos.
+For a detailed step-by-step walkthrough, see the [User Guide (USER_GUIDE.md)](USER_GUIDE.md).
 
 ---
 
-## 2. Características Principales
+## 1. Architecture & Security Principles
 
-### Interfaz Gráfica de Escritorio (PySide6 / Qt6)
-* **Tema Oscuro Moderno**: Diseño profesional de alta fidelidad para desarrolladores, optimizado para largas jornadas de trabajo.
-* **Soporte Drag & Drop**: Arrastra y suelta la carpeta de cualquier proyecto Ren'Py directamente en la aplicación para una inspección instantánea.
-* **Tarjetas Métricas Interactivas**: Contadores en vivo para *Total Issues*, *Errors / Critical*, *Warnings*, *Info / Tips* y *Scanned In (segundos)*, con filtrado rápido con un solo clic.
-* **Barra de Filtrado Multi-Criterio en Vivo**:
-  * Búsqueda en tiempo real por texto (regla, título, mensaje o nombre de archivo).
-  * Selector dinámico de nivel de severidad (`CRITICAL`, `ERROR`, `WARNING`, `INFO`).
-  * Selector dinámico de categoría (`Code`, `Assets`, `Audio`, `Images`, `Translation`, `References`, `Project Structure`).
-* **Tabla Interactiva de Incidencias**: Visualización ordenada por severidad, ID de regla, título, ubicación relativa en disco (`game/...:LXX`) y categoría, con selección vinculada.
-* **Panel Lateral de Diagnóstico Detallado**:
-  * Visualizador monoespaciado de fragmentos de código fuente original con el error exacto resaltado.
-  * Caja de **Acción Recomendada** (` RECOMMENDED ACTION`) con instrucciones precisas para solucionar cada fallo.
-  * Metadatos de regla, categoría y ubicación exacta.
-* **Worker Asíncrono no Bloqueante (`QThread`)**: Barra de progreso continua con actualización en tiempo real del porcentaje y el nombre de cada una de las 20 reglas evaluadas paso a paso.
-* **Exportación Directa en 1 Clic**: Botones nativos para guardar reportes en HTML interactivo y JSON estructurado sin salir de la GUI.
-
-### Herramienta CLI para Pipelines e Integración Continua (CI/CD)
-* Salida formateada y enriquecida en terminal con resumen estadístico y desglose por severidad y archivo.
-* Códigos de salida estándar para fallar automáticamente builds de CI ante errores críticos (`exit 1` en presencia de fallos; `exit 0` si está limpio).
-* Flags `--export-json` y `--export-html` para integración desatendida en GitHub Actions, GitLab CI o scripts de build.
-
-### Reportes Multi-Formato Autónomos
-* **Reporte HTML Autónomo**: Archivo HTML único y autocontenido (zero dependencias CDN, CSS/JS embebidos) con motor de búsqueda interactivo, filtros de severidad y diseño responsivo para enviar a directores de arte, guionistas o traductores.
-* **Reporte JSON Estructurado**: Esquema versionado v1.0.0 listo para ingesta en sistemas de QA, SonarQube, dashboards corporativos o herramientas personalizadas.
-
-### Compilación Standalone para Windows (.exe)
-* Especificación PyInstaller optimizada (`renpy_inspector.spec`) y scripts de compilación listos para generar el ejecutable `.exe` independiente sin requerir Python instalado en la máquina del usuario final.
+* **100% Static & Safe**: Treats game scripts as **untrusted data** (`SCAN → ANALYZE → REPORT`). It never calls `eval()`, `exec()`, or `compile()`, and never imports `.rpy` scripts or user Python code into runtime.
+* **Zero Code Modification**: Strictly read-only operations. It never alters, rewrites, or mutates any user project files.
+* **Completely Local & Offline**: Zero internet connectivity, zero telemetry. All scripts, assets, and metadata are processed entirely on your local machine, protecting your intellectual property.
+* **High-Performance Determinism**: Pure Python lexical-syntactic engine capable of scanning and analyzing massive projects with 2,000+ `.rpy` scripts and tens of thousands of assets in under 22 seconds.
 
 ---
 
-## 3. Catálogo Completo de Reglas de QA (20 Reglas)
+## 2. Key Features
 
-Ren'Py Inspector cuenta con un motor determinista con **20 reglas estáticas** divididas en 6 categorías:
+### Desktop Graphical Interface (PySide6 / Qt6)
+* **Modern Dark Theme**: Professional developer-focused UI inspired by Linear and VS Code.
+* **Drag & Drop Support**: Drop your Ren'Py project folder directly onto the window for instant inspection.
+* **Interactive Metric Cards**: Real-time summary counters for *Total Issues*, *Errors / Critical*, *Warnings*, *Info / Tips*, and *Scan Duration (seconds)*, featuring 1-click table filtering.
+* **Live Multi-Criteria Filtering**:
+  * Real-time search across rule ID, title, error message, or filename.
+  * Dynamic severity selector (`CRITICAL`, `ERROR`, `WARNING`, `INFO`).
+  * Dynamic category selector (`Code`, `Assets`, `Audio`, `Images`, `Translation`, `References`).
+* **Interactive Issues Table**: Sortable table with color-coded severity badges, rule identifiers, titles, disk locations (`game/...:LXX`), and categories.
+* **Detailed Diagnostics Pane**:
+  * Monospaced code snippet viewer showing original source code with contextual line numbers.
+  * Prominent **Recommended Action** (`💡 RECOMMENDED ACTION`) box providing direct copy-pasteable fix instructions.
+  * Exact file location and rule metadata.
+* **Non-Blocking Async Worker (`QThread`)**: Smooth progress bar showing live evaluation of each of the 20 rules step-by-step with instant cancellation support.
+* **Direct 1-Click Exporters**: Native buttons to export standalone interactive HTML reports and structured JSON data.
 
-| ID | Regla | Severidad | Categoría | Edición | Descripción y Detección |
+### CLI Tool for CI/CD Automation & Pipelines
+* Formatted terminal output with clean statistical breakdown and categorized notices.
+* Standard POSIX exit codes to automatically fail continuous integration builds on critical errors (`exit 1` on critical issues; `exit 0` when clean).
+* `--severity`, `--category`, `--show-info`, `--export-json`, and `--export-html` flags for headless workflows.
+
+### Autonomous Multi-Format Reporting
+* **Interactive Standalone HTML Report**: Single, self-contained `.html` file (zero CDN dependencies, embedded CSS/JS) featuring client-side search, severity filters, and responsive design to share with scriptwriters, artists, or translators.
+* **Structured JSON Report**: Versioned v1.0.0 schema ready for ingestion into custom QA dashboards, SonarQube, or analytics pipelines.
+
+### Windows Standalone Executable (.exe)
+* Optimized PyInstaller specification (`renpy_inspector.spec`) and build scripts to generate a single-file portable `.exe` that runs without requiring Python on target machines.
+
+---
+
+## 3. Complete QA Rules Catalog (20 Core Rules)
+
+Ren'Py Inspector features **20 deterministic static analysis rules** across 6 categories:
+
+| Rule ID | Name | Severity | Category | Tier | Description & Detection |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `RPY-CODE-001` | **Broken Jump Target** | `ERROR` | Code | Free | Detecta sentencias `jump` hacia labels inexistentes en el proyecto. |
-| `RPY-CODE-002` | **Broken Call Target** | `ERROR` | Code | Free | Detecta sentencias `call` hacia labels que no están definidas. |
-| `RPY-CODE-003` | **Duplicate Label Definition** | `ERROR` | Code | Free | Identifica colisiones donde un mismo label se define en múltiples archivos de script. |
-| `RPY-CODE-004` | **Conflicting Define/Default** | `WARNING` | Code | Free | Alerta cuando una variable se declara simultáneamente con `define` (constante) y `default` (mutable). |
-| `RPY-CODE-005` | **Unused Label** | `INFO` | Code | Pro | Detecta labels definidas que nunca son alcanzadas por `jump`, `call`, menú ni referencias en scripts. |
-| `RPY-CODE-006` | **Shadowed Ren'Py Built-in** | `WARNING` | Code | Pro | Detecta variables de usuario que sobreescriben objetos internos o palabras reservadas (`renpy`, `config`, `store`, `persistent`). |
-| `RPY-CODE-007` | **Unreachable Code Statement** | `WARNING` | Code | Free | Detecta diálogo o sentencias inmediatamente posteriores a un `jump` o `return` incondicional sin un label intermedio. |
-| `RPY-CODE-008` | **Persistent Variable with Define** | `ERROR` | Code | Free | Detecta variables `persistent.*` declaradas con `define` en lugar de `default` (lo que borra y resetea el valor en cada arranque del juego). |
-| `RPY-CODE-009` | **Empty Menu Statement** | `ERROR` | Code | Free | Detecta bloques `menu:` que no contienen ninguna opción seleccionable, lo que provocaría una excepción fatal en Ren'Py. |
-| `RPY-CODE-010` | **Invalid Init Priority** | `WARNING` | Code | Free | Detecta prioridades `init` fuera del rango seguro para código de usuario (-999 a 999), reservado para el motor interno. |
-| `RPY-SCREEN-001` | **Undefined Screen** | `ERROR` | Code | Pro | Detecta sentencias `call screen`, `show screen` o `hide screen` hacia pantallas inexistentes en el proyecto. |
-| `RPY-SCREEN-002` | **Duplicate Screen Definition** | `WARNING` | Code | Free | Detecta pantallas definidas múltiples veces bajo el mismo nombre y variante, causando sobrescritura silenciosa. |
-| `RPY-AUDIO-001` | **Missing Audio File** | `ERROR` | Audio | Free | Detecta pistas de música, sonido o voz invocadas con `play` o `queue` que no existen en el disco. |
-| `RPY-AUDIO-002` | **Invalid Audio Channel** | `WARNING` | Assets | Pro | Detecta canales de audio desconocidos o con errores tipográficos fuera de los estándar (`music`, `sound`, `voice`, `audio`). |
-| `RPY-IMAGE-001` | **Missing Image File** | `ERROR` | Images | Free | Detecta imágenes declaradas en sentencias `image` explícitas que no existen en el sistema de archivos. |
-| `RPY-FONT-001` | **Missing Font File** | `ERROR` | Assets | Free | Detecta fuentes tipográficas configuradas en variables `gui.*` o scripts ausentes en la carpeta `game/`. |
-| `RPY-REF-001` | **Asset Case Mismatch** | `WARNING` | References | Pro | Detecta diferencias de mayúsculas/minúsculas en rutas entre el código y el disco (previene crashes en Linux, Steam Deck y macOS). |
-| `RPY-TL-001` | **Missing Translation Block** | `WARNING` | Translation | Pro | Detecta bloques de diálogo traducidos en un idioma pero faltantes en otros paquetes de localización. |
-| `RPY-ASSET-001` | **Potentially Unused Asset** | `INFO` | Assets | Pro | Identifica imágenes y archivos de audio en disco que no tienen ninguna referencia estática en el código del juego. |
-| `RPY-TEXT-001` | **Unclosed Text Tag in Dialogue** | `WARNING` | Code | Free | Detecta etiquetas de formato de texto (`{b}`, `{i}`, `{color=...}`, `{size=...}`, etc.) abiertas pero nunca cerradas en diálogos. |
+| `RPY-CODE-001` | **Broken Jump Target** | `ERROR` | Code | Free | Detects `jump` statements targeting labels that do not exist in the project. |
+| `RPY-CODE-002` | **Broken Call Target** | `ERROR` | Code | Free | Detects `call` statements referencing labels that are not defined. |
+| `RPY-CODE-003` | **Duplicate Label Definition** | `ERROR` | Code | Free | Detects identical label definitions across multiple `.rpy` script files. |
+| `RPY-CODE-004` | **Conflicting Define/Default** | `WARNING` | Code | Free | Warns when a variable is declared with both `define` (constant) and `default` (mutable). |
+| `RPY-CODE-005` | **Unused Label** | `INFO` | Code | Pro | Identifies defined labels that are never reached by jumps, calls, or menus. |
+| `RPY-CODE-006` | **Shadowed Ren'Py Built-in** | `WARNING` | Code | Pro | Warns when user variables shadow core Ren'Py engine globals (`renpy`, `config`, `store`, `persistent`). |
+| `RPY-CODE-007` | **Unreachable Code Statement** | `WARNING` | Code | Free | Detects dialogue or statements immediately following an unconditional `jump` or `return` without an intervening label. |
+| `RPY-CODE-008` | **Persistent Variable with Define** | `ERROR` | Code | Free | Detects `persistent.*` variables declared using `define` instead of `default` (which resets persistence on every launch). |
+| `RPY-CODE-009` | **Empty Menu Statement** | `ERROR` | Code | Free | Detects `menu:` blocks without selectable choice items, which causes a fatal Ren'Py runtime crash. |
+| `RPY-CODE-010` | **Invalid Init Priority** | `WARNING` | Code | Free | Warns when `init` priorities fall outside the safe user range (-999 to 999), reserved for internal engine code. |
+| `RPY-SCREEN-001` | **Undefined Screen** | `ERROR` | Code | Pro | Detects `call screen`, `show screen`, or `hide screen` statements referencing nonexistent screens. |
+| `RPY-SCREEN-002` | **Duplicate Screen Definition** | `WARNING` | Code | Free | Detects screens defined multiple times with the same name and variant, causing silent overwriting. |
+| `RPY-AUDIO-001` | **Missing Audio File** | `ERROR` | Audio | Free | Detects music, sound, or voice audio files referenced in `play`/`queue` statements missing from disk. |
+| `RPY-AUDIO-002` | **Invalid Audio Channel** | `WARNING` | Assets | Pro | Detects unrecognized or mistyped audio channels outside standard channels (`music`, `sound`, `voice`, `audio`). |
+| `RPY-IMAGE-001` | **Missing Image File** | `ERROR` | Images | Free | Detects explicit `image` declarations pointing to file paths that do not exist on disk. |
+| `RPY-FONT-001` | **Missing Font File** | `ERROR` | Assets | Free | Detects font files declared in `gui.*` or scripts missing from the `game/` folder. |
+| `RPY-REF-001` | **Asset Case Mismatch** | `WARNING` | References | Pro | Detects file path casing differences between script code and disk (prevents crashes on Linux, Steam Deck & macOS). |
+| `RPY-TL-001` | **Missing Translation Block** | `WARNING` | Translation | Pro | Detects dialogue translation blocks present in some target languages but missing in others. |
+| `RPY-ASSET-001` | **Potentially Unused Asset** | `INFO` | Assets | Pro | Identifies image and audio files on disk that have no static references across all project scripts. |
+| `RPY-TEXT-001` | **Unclosed Text Tag in Dialogue** | `WARNING` | Code | Free | Detects dialogue text formatting tags (`{b}`, `{i}`, `{color=...}`, `{size=...}`) opened but never closed. |
 
 ---
 
-## 4. Capacidades Avanzadas del Parser y Motor
+## 4. Advanced Parser & Inference Engine Capabilities
 
-Ren'Py Inspector no es un simple buscador de texto por regex; implementa un motor de parsing léxico y sintáctico con semántica profunda del motor Ren'Py:
+Ren'Py Inspector goes far beyond basic regex search; it features a dedicated parser with deep engine semantics:
 
-1. **Resolución Recursiva por Stem de Audio**:
-   Ren'Py permite reproducir audios especificando únicamente el nombre base o resolviendo archivos dentro de `game/audio/`, `game/voice/`, `game/music/` o subdirectorios profundos. Ren'Py Inspector indexa los stems y subrutas para evitar falsos positivos de audios no encontrados.
+1. **Recursive Audio Stem Resolution**:
+   Ren'Py permits playing audio using only a short stem name, resolving files automatically inside `game/audio/`, `game/voice/`, `game/music/`, or nested subdirectories. The inspector recursively indexes stems to avoid false alarms.
 
-2. **Jerarquía y Alias de Nombres de Imágenes**:
-   Soporta la convención de Ren'Py donde sentencias como `show eileen happy` pueden corresponder tanto a `game/images/eileen happy.png` como a subcarpetas como `game/images/eileen/happy.png`.
+2. **Hierarchical Image Tag & Directory Resolution**:
+   Supports Ren'Py's image naming conventions where `show eileen happy` can match both `game/images/eileen happy.png` and subdirectories like `game/images/eileen/happy.png`.
 
-3. **Screen Actions y Referencias de Runtime**:
-   Inspecciona botones y componentes de interfaz que usan acciones de pantalla como `action [Jump("capitulo_2"), Show("menu_inventario")]`, así como llamadas de runtime de Python en scripts (`renpy.jump("...")`, `renpy.call("...")`, `renpy.show_screen("...")`).
+3. **Screen Actions & Runtime Invocations**:
+   Inspects button actions such as `action [Jump("chapter_2"), Show("inventory_menu")]`, as well as Python runtime invocations (`renpy.jump("...")`, `renpy.call("...")`, `renpy.show_screen("...")`).
 
-4. **Signaturas Multilínea de Pantallas**:
-   Analiza definiciones complejas de pantallas con múltiples argumentos y tuplas distribuidas a lo largo de varias líneas sin perder la referencia del nodo.
+4. **Multiline Screen Signatures**:
+   Parses complex screen definitions with multiple default arguments and tuples spanning across multiple physical lines.
 
-5. **Sintaxis de Menús con Argumentos y Menús Nombrados en Línea**:
-   Soporta menús con parámetros de pantalla (`menu (screen="choice_wheel"):`), opciones de menú con argumentos (`"Opción" (arg=True):`) y menús nombrados en línea (`menu selector_de_camino:`), evitando falsos positivos de labels no utilizados o saltos rotos.
+5. **Menus with Arguments & Inline Named Menus**:
+   Supports screen arguments (`menu (screen="choice_wheel"):`), choice arguments (`"Option" (arg=True):`), and inline named menus (`menu branch_selector:`), preventing false unused label warnings.
 
-6. **Validador de Etiquetas de Formato de Diálogo**:
-   Reconoce la totalidad de etiquetas de estilo de texto de Ren'Py (`{b}`, `{i}`, `{u}`, `{s}`, `{size}`, `{color}`, `{font}`, `{cps}`, `{alpha}`, etc.) ignorando etiquetas de autocierre (`{w}`, `{p}`, `{nw}`, `{fast}`) o etiquetas escapadas con llaves dobles.
+6. **Dialogue Formatting Tag Validator**:
+   Validates standard Ren'Py text tags (`{b}`, `{i}`, `{u}`, `{s}`, `{size}`, `{color}`, `{font}`, `{cps}`, `{alpha}`) while ignoring self-closing tags (`{w}`, `{p}`, `{nw}`, `{fast}`) and escaped double brackets.
 
-7. **Filtrado Inteligente de Plantillas de Traducción**:
-   Discrimina automáticamente directorios de plantillas base como `game/tl/None` para no generar avisos falsos de traducciones omitidas sobre código de referencia no traducido.
+7. **Translation Template Filtering**:
+   Automatically identifies reference template folders like `game/tl/None` to avoid emitting spurious missing translation warnings.
 
-8. **Soporte de Formatos Modernos**:
-   * **Imágenes**: `.png`, `.jpg`, `.jpeg`, `.webp`, `.avif`, `.svg`.
+8. **Modern Format Support**:
+   * **Images**: `.png`, `.jpg`, `.jpeg`, `.webp`, `.avif`, `.svg`.
    * **Audio**: `.mp3`, `.ogg`, `.opus`, `.wav`, `.flac`.
-   * **Tipografías**: `.ttf`, `.otf`.
+   * **Fonts**: `.ttf`, `.otf`.
 
 ---
 
-## 5. Rendimiento y Escalabilidad (Benchmark de Producción)
+## 5. Performance & Scalability (Production Benchmark)
 
-Ren'Py Inspector ha sido diseñado específicamente para satisfacer las exigencias de estudios y desarrolladores comerciales, garantizando análisis estático de alto rendimiento con tiempos de respuesta prácticamente instantáneos tanto en prototipos como en producciones masivas con cientos de miles de líneas de diálogo y decenas de miles de recursos multimedia.
+Ren'Py Inspector is built to meet the needs of commercial game studios, delivering near-instant static analysis across projects of all scales:
 
-### Tiempos de Escaneo por Escala de Proyecto
+### Scanning Speeds by Project Scale
 
-| Escala del Proyecto | Scripts `.rpy` Típicos | Assets Multimedia | Tiempo Medio de Escaneo | Casos de Uso Recomendados |
+| Project Scale | Typical Scripts | Multimedia Assets | Average Scan Duration | Recommended Use Cases |
 | :--- | :---: | :---: | :---: | :--- |
-| **Demo / Prototipo** | < 25 scripts | Hasta 500 assets | **< 0.1 segundos** | Game jams, pruebas de concepto, demos jugables |
-| **Novela Visual Estándar** | 25 a 150 scripts | 500 a 5,000 assets | **0.3 a 0.8 segundos** | Novelas visuales narrativas medianas, kinetiscopes |
-| **Producción Comercial Grande** | 150 a 500 scripts | 5,000 a 15,000 assets | **1.2 a 2.8 segundos** | Novelas visuales con rutas múltiples, minijuegos y actuación de voz |
-| **Producción Masiva / RPG** | 500 a 1,000+ scripts | 15,000 a 35,000+ assets | **3.5 a 6.5 segundos** | Títulos de gran escala, mundos abiertos o sistemas de mecánicas complejas |
+| **Demo / Prototype** | < 25 scripts | Up to 500 assets | **< 0.1 seconds** | Game jams, proof of concepts, playable demos |
+| **Standard Visual Novel** | 25 to 150 scripts | 500 to 5,000 assets | **0.3 to 0.8 seconds** | Narrative visual novels, kinetic novels |
+| **Large Commercial Game** | 150 to 500 scripts | 5,000 to 15,000 assets | **1.2 to 2.8 seconds** | Branching visual novels, minigames, full voice acting |
+| **Massive Production / RPG** | 500 to 1,000+ scripts | 15,000 to 35,000+ assets | **3.5 to 6.5 seconds** | Open-world or complex mechanic Ren'Py productions |
 
-### Métricas de Fiabilidad y Rendimiento
-* **Capacidad de Análisis Masivo**: Validado exhaustivamente en conjuntos de prueba que superan los **2,800 archivos de script** y más de **95,000 recursos multimedia**.
-* **Alto Rendimiento**: Tasa sostenida de análisis superior a **120 scripts por segundo** en equipos estándar de desarrollo.
-* **Consumo de Memoria Eficiente**: El análisis estático de solo lectura evita la carga innecesaria de archivos multimedia pesados en RAM.
-* **Determinismo Total**: Resultados idénticos y 100% reproducibles en cualquier plataforma (Windows, macOS, Linux).
+### Reliability Metrics
+* **Stress-Tested Scale**: Validated on test suites spanning over **2,800 script files** and **95,000+ multimedia assets**.
+* **High Throughput**: Sustained analysis rate exceeding **120 scripts per second** on standard developer hardware.
+* **Low Memory Footprint**: Read-only static analysis avoids loading heavy audio/video media into RAM.
+* **100% Deterministic**: Identical, reproducible results across Windows, macOS, and Linux.
 
 ---
 
-## 6. Instalación y Requisitos
+## 6. Installation & Prerequisites
 
-### Requisitos del Sistema
-* Windows 10/11, macOS 12+, o Linux x86_64.
-* Python 3.11 o superior.
-* PySide6 6.5+ (incluido en las dependencias).
+### System Requirements
+* Windows 10/11, macOS 12+, or Linux x86_64.
+* Python 3.11 or higher.
+* PySide6 6.5+ (included in dependencies).
 
-### Instalación en Modo Desarrollo
+### Development Installation
 ```bash
-# Clonar o situarse en el directorio del proyecto
+# Clone or navigate to the repository directory
 cd renpy_inspector
 
-# Instalar en modo editable con dependencias completas y suite de tests
+# Install in editable mode with development dependencies
 pip install -e ".[dev]"
 ```
 
 ---
 
-## 7. Guía de Uso
+## 7. Quick Usage Guide
 
-### Modo Gráfico (GUI)
-Para iniciar la interfaz gráfica de usuario:
+### Desktop GUI
+To launch the graphical interface:
 
 ```bash
-# Lanzar la aplicación gráfica directamente
+# Launch the desktop application directly
 renpy-inspector-gui
 
-# O abrir un proyecto específico directamente desde la terminal
-python -m renpy_inspector --gui "C:/Juegos/MiProyectoRenpy"
+# Or inspect a specific project directly from terminal
+renpy-inspector --gui "C:/Games/MyRenpyGame"
 ```
 
-### Modo Línea de Comandos (CLI)
-Ideal para inspección rápida o integración en scripts de automatización:
+### Command-Line Interface (CLI)
+Ideal for fast local checks or continuous integration pipelines:
 
 ```bash
-# Inspección estándar de un proyecto
-python -m renpy_inspector "C:/Juegos/MiProyectoRenpy"
+# Standard project inspection
+renpy-inspector "C:/Games/MyRenpyGame"
 
-# Mostrar incidencias informativas (como assets sin uso)
-python -m renpy_inspector "C:/Juegos/MiProyectoRenpy" --show-info
+# Display INFO severity issues (such as unused assets)
+renpy-inspector "C:/Games/MyRenpyGame" --show-info
 
-# Filtrar por severidad mínima
-python -m renpy_inspector "C:/Juegos/MiProyectoRenpy" --severity ERROR
+# Filter by minimum severity threshold (CRITICAL, ERROR, WARNING, INFO)
+renpy-inspector "C:/Games/MyRenpyGame" --severity ERROR
 
-# Filtrar por categoría específica
-python -m renpy_inspector "C:/Juegos/MiProyectoRenpy" --category Code
+# Filter by category (Code, Assets, Translation, etc.)
+renpy-inspector "C:/Games/MyRenpyGame" --category Code
 
-# Exportar reportes automatizados en HTML interactivo y JSON estructurado
-python -m renpy_inspector "C:/Juegos/MiProyectoRenpy" --export-html reporte_qa.html --export-json reporte_qa.json
+# Export automated interactive HTML and structured JSON reports
+renpy-inspector "C:/Games/MyRenpyGame" --export-html qa_report.html --export-json qa_report.json
 ```
 
 ---
 
-## 8. Compilación Standalone para Windows (.exe)
+## 8. Windows Standalone Executable (.exe)
 
-Ren'Py Inspector incluye una configuración completa de PyInstaller (`renpy_inspector.spec`) para generar un ejecutable `.exe` 100% autónomo y portable que no requiere Python en la máquina destino:
+Ren'Py Inspector includes a PyInstaller specification (`renpy_inspector.spec`) to build a 100% standalone, portable `.exe` that runs without Python installed:
 
 ```powershell
-# Opción 1: Compilar mediante el script automatizado de PowerShell
+# Option 1: Build with automated PowerShell script
 powershell -ExecutionPolicy Bypass -File scripts/build_exe.ps1
 
-# Opción 2: Compilar directamente con Python
+# Option 2: Build directly with Python
 python scripts/build_windows.py
 ```
 
-El ejecutable optimizado se generará en:
+The optimized binary will be generated at:
 ```text
 dist/RenPyInspector.exe
 ```
 
 ---
 
-## 9. Configuración y Personalización
+## 9. Custom Configuration (`renpy-inspector.toml`)
 
-El comportamiento de las reglas y del escáner puede personalizarse creando un archivo `renpy-inspector.toml` en la raíz del juego o mediante `pyproject.toml`:
+Customize rules and scanning behavior by creating a `renpy-inspector.toml` file in your game root (or under `[tool.renpy-inspector]` in `pyproject.toml`):
 
 ```toml
 [tool.renpy-inspector]
-# Desactivar reglas específicas
+# Disable specific rules
 disabled_rules = [
-    "RPY-ASSET-001",  # Ignorar assets potencialmente no utilizados
+    "RPY-ASSET-001",  # Ignore unreferenced asset candidates
 ]
 
-# Ignorar carpetas o patrones específicos
+# Ignore specific paths or cache directories
 ignore_patterns = [
     "game/tl/None/**",
     "game/cache/**",
 ]
 
-# Registrar canales de audio personalizados del juego
+# Register custom audio channels used by your game
 custom_audio_channels = [
     "ambient",
     "effects",
     "movie",
 ]
 
-# Configuración de severidad personalizada
+# Override rule severity levels
 [tool.renpy-inspector.severity_overrides]
-"RPY-CODE-007" = "ERROR"   # Tratar código inalcanzable como error crítico
-"RPY-REF-001"  = "ERROR"   # Exigir correspondencia exacta de mayúsculas/minúsculas
+"RPY-CODE-007" = "ERROR"   # Elevate unreachable code to critical error
+"RPY-REF-001"  = "ERROR"   # Enforce strict cross-platform casing match
 ```
 
 ---
 
-## 10. Suite de Pruebas y Aseguramiento de Calidad
+## 10. Automated Test Suite & Quality Assurance
 
-El proyecto cuenta con una cobertura completa de pruebas automatizadas que validan el 100% de las 20 reglas, el motor de parsing, el sistema de catalogación, los exportadores, la interfaz gráfica en modo headless y la empaquetación de Windows:
+The project features a comprehensive test suite validating all 20 rules, the parsing engine, file cataloging, reporting modules, headless GUI components, and Windows packaging:
 
 ```bash
-# Ejecutar los 111 tests automatizados
+# Run all 113 automated tests
 pytest
 
-# Ejecutar con reporte detallado de cobertura
+# Run tests with detailed code coverage report
 pytest --cov=renpy_inspector
 
-# Validar calidad de código y estilo con ruff
+# Check code style and linting with ruff
 ruff check .
 ```
 
 ---
 
-## 11. Licencia y Soporte
+## 11. License & Support
 
-Copyright © 2026. Todos los derechos reservados.
-Desarrollado para la comunidad y estudios profesionales de videojuegos Ren'Py.
+Copyright © 2026. All rights reserved.
+Developed for the Ren'Py visual novel community and game development studios worldwide.

@@ -1,134 +1,136 @@
-# Ren'Py Inspector — User Guide & Manual de Usuario
+# Ren'Py Inspector — User Guide & Manual
 
-Bienvenido a la guía oficial de usuario de **Ren'Py Inspector**.
+> 🌐 **Language / Idioma**: [English](USER_GUIDE.md) • [Español](USER_GUIDE.es.md)
 
-Este manual explica detalladamente cómo utilizar la herramienta en sus modalidades de interfaz gráfica de escritorio (GUI), ejecutable independiente para Windows (`.exe`) y línea de comandos (CLI), cómo integrarla en flujos automatizados de CI/CD, cómo personalizar su configuración y cómo extenderla con reglas propias.
+Welcome to the official **Ren'Py Inspector** User Guide.
+
+This manual explains how to use the tool across its graphical desktop interface (GUI), standalone Windows executable (`.exe`), and command-line interface (CLI), as well as how to integrate it into automated CI/CD workflows, configure custom rules, and build your own extensions.
 
 ---
 
-## 1. Modalidades de Ejecución
+## 1. Execution Modes
 
-Ren'Py Inspector puede ejecutarse de tres formas según tu entorno de trabajo:
+Ren'Py Inspector can be executed in three ways depending on your development environment:
 
-### 1.1 Ejecutable Standalone de Windows (`RenPyInspector.exe`)
-Si dispones de la versión compilada para Windows, no requieres instalar Python ni dependencias externas:
-* **Doble clic**: Haz doble clic sobre `RenPyInspector.exe` para abrir la interfaz gráfica de inmediato.
-* **Desde PowerShell / CMD**:
+### 1.1 Standalone Windows Executable (`RenPyInspector.exe`)
+If you downloaded or built the standalone Windows version, you do not need Python or any external dependencies:
+* **Double-click**: Double-click `RenPyInspector.exe` in Windows Explorer to open the graphical user interface directly.
+* **From PowerShell / Command Prompt**:
   ```powershell
   .\RenPyInspector.exe
-  # O abrir un proyecto específico directamente
-  .\RenPyInspector.exe "C:\Juegos\MiProyectoRenpy"
+  # Or open a specific project folder directly
+  .\RenPyInspector.exe "C:\Games\MyRenpyGame"
   ```
 
-### 1.2 Interfaz Gráfica con Python / PySide6 (GUI)
-Si estás usando el entorno virtual de Python:
+### 1.2 Python Desktop GUI (PySide6 / Qt6)
+If you are working inside a Python virtual environment:
 ```bash
-# Iniciar la aplicación gráfica directamente
+# Launch the desktop GUI directly
 renpy-inspector-gui
 
-# O bien mediante el comando del módulo
-python -m renpy_inspector --gui "C:/Juegos/MiProyectoRenpy"
+# Or via Python module syntax
+python -m renpy_inspector --gui "C:/Games/MyRenpyGame"
 ```
 
-### 1.3 Herramienta de Línea de Comandos (CLI)
-Ideal para integración continua, terminales de desarrollo y scripts de automatización:
+### 1.3 Command-Line Interface (CLI)
+Ideal for continuous integration, developer terminals, and build scripts:
 ```bash
-# Opción 1: Mediante el comando directo de consola
-renpy-inspector "C:/Juegos/MiProyectoRenpy"
+# Option 1: Direct console executable
+renpy-inspector "C:/Games/MyRenpyGame"
 
-# Opción 2: Mediante el comando de módulo Python
-python -m renpy_inspector "C:/Juegos/MiProyectoRenpy"
+# Option 2: Python module execution
+python -m renpy_inspector "C:/Games/MyRenpyGame"
 ```
 
 ---
 
-## 2. Guía de la Interfaz Gráfica de Escritorio (Desktop GUI)
+## 2. Desktop Graphical Interface Guide
 
-### 2.1 Selección y Carga del Proyecto
-1. **📁 Botón Browse**: Haz clic para navegar y seleccionar la carpeta raíz de tu juego Ren'Py o directamente la subcarpeta `game/`.
-2. **Arrastrar y Soltar (Drag & Drop)**: Arrastra la carpeta de tu juego directamente desde el Explorador de Archivos de Windows o Finder sobre la ventana de la aplicación.
-3. **Indicador de Validación**:
-   * <span style="color:#3fb950; font-weight:bold;">Verde</span>: Directorio `game/` detectado y válido. Listo para inspeccionar.
-   * <span style="color:#e3b341; font-weight:bold;">Amarillo</span>: La carpeta seleccionada no parece contener la estructura estándar de Ren'Py.
-4. Haz clic en **🔍 Inspect Project** para iniciar el análisis.
+### 2.1 Selecting and Loading a Project
+1. **📁 Browse Button**: Click to open a directory picker and select your Ren'Py project root (or directly its `game/` folder).
+2. **Drag & Drop**: Drag your game folder directly from Windows Explorer or macOS Finder onto the Ren'Py Inspector window.
+3. **Status Indicator**:
+   * <span style="color:#3fb950; font-weight:bold;">Green</span>: Valid Ren'Py `game/` directory detected. Ready to inspect.
+   * <span style="color:#e3b341; font-weight:bold;">Yellow</span>: The selected folder does not appear to contain a standard Ren'Py structure.
+4. Click **🔍 Inspect Project** to start the analysis.
 
-### 2.2 Barra de Progreso y Evaluación Asíncrona
-Durante la inspección, la aplicación ejecuta el análisis en un hilo en segundo plano (`QThread`) para mantener la ventana 100% fluida y responsiva:
-* La barra de progreso muestra el avance en porcentaje ($0\% \to 100\%$).
-* La etiqueta de estado informa en tiempo real qué regla se está evaluando paso a paso (ejemplo: `Evaluando regla 7/20: Unreachable Code Statement...`).
+### 2.2 Asynchronous Background Evaluation
+During inspection, the app runs analysis in a dedicated background worker (`QThread`) keeping the UI completely fluid and responsive:
+* The progress bar displays real-time progress from $0\% \to 100\%$.
+* The status label dynamically reports which static rule is currently being evaluated (e.g., `Evaluating rule 7/20: Unreachable Code Statement...`).
 
-### 2.3 Dashboard de Tarjetas Métricas
-Una vez finalizado el análisis (generalmente en menos de 1 segundo), verás:
-* **TOTAL ISSUES**: Conteo global de incidencias detectadas.
-* **ERRORS / CRITICAL**: Fallos críticos que causarán un crash en tiempo de ejecución o romperán el flujo del juego (ej. saltos hacia labels inexistentes, pantallas no definidas o variables persistentes mal declaradas).
-* **WARNINGS**: Discrepancias potenciales que pueden causar comportamientos inesperados (ej. inconsistencias de mayúsculas/minúsculas entre Windows y Linux/Steam Deck, menús vacíos o etiquetas de texto sin cerrar).
-* **INFO / TIPS**: Sugerencias de limpieza y optimización (ej. imágenes o audios en disco sin referencias estáticas, o labels huérfanas).
-* **SCANNED IN**: Tiempo exacto de procesamiento expresado en segundos.
+### 2.3 Metric Summary Cards Dashboard
+Once the scan completes (typically in under 1 second), the dashboard displays:
+* **TOTAL ISSUES**: Overall number of problems discovered.
+* **ERRORS / CRITICAL**: Severe issues that will crash the game at runtime or break script flow (e.g., jumps to missing labels, undefined screens, or persistent variables declared with `define`).
+* **WARNINGS**: Potential inconsistencies and risks (e.g., cross-platform casing discrepancies between Windows and Linux/Steam Deck, duplicate screens, or unclosed dialogue formatting tags).
+* **INFO / TIPS**: Clean-up opportunities (e.g., unused image or audio files on disk, or unreferenced labels).
+* **SCANNED IN**: Exact processing duration in seconds.
 
-> **Tip de Productividad**: Haz clic sobre cualquiera de las tarjetas métricas (**TOTAL**, **ERRORS**, **WARNINGS**, **INFO**) para filtrar la tabla al instante con un solo clic.
+> **Productivity Tip**: Click any metric card (**TOTAL**, **ERRORS**, **WARNINGS**, **INFO**) to instantly filter the issues table with a single click.
 
-### 2.4 Filtrado y Búsqueda Multi-Criterio
-La barra superior de filtrado permite combinar criterios dinámicos en tiempo real:
-* **Buscador de Texto**: Escribe cualquier término (ej. `script.rpy`, `RPY-CODE-001`, `screen`, `menu`) para filtrar inmediatamente la tabla mientras escribes.
-* **Selector de Severidad**: Filtra por `All Severities`, `CRITICAL`, `ERROR`, `WARNING` o `INFO`.
-* **Selector de Categoría**: Filtra por categorías especializadas:
-  * `Code`: Lógica, saltos, menús, etiquetas, código inalcanzable y persistencia.
-  * `Assets`: Fuentes tipográficas, canales de audio y archivos huérfanos.
-  * `Audio`: Pistas de música, sonido y voz faltantes.
-  * `Images`: Declaraciones de imágenes ausentes en disco.
-  * `Translation`: Bloques de localización y traducciones incompletas.
-  * `References`: Discrepancias de mayúsculas/minúsculas entre código y sistema de archivos.
-* **Reset Filters**: Restablece todos los filtros para mostrar la totalidad de incidencias.
+### 2.4 Multi-Criteria Live Filtering
+The toolbar above the table allows combining dynamic filters in real time:
+* **Text Search**: Type any search query (e.g., `script.rpy`, `RPY-CODE-001`, `screen`, `menu`) to filter issues as you type.
+* **Severity Filter**: Filter by `All Severities`, `CRITICAL`, `ERROR`, `WARNING`, or `INFO`.
+* **Category Filter**: Filter by specific problem domains:
+  * `Code`: Narrative logic, jumps, calls, menus, labels, dead code, and persistence.
+  * `Assets`: Font files, audio channels, and orphan files.
+  * `Audio`: Missing music, sound effect, and voice files.
+  * `Images`: Missing explicit image declarations.
+  * `Translation`: Localization blocks and untranslated dialogues.
+  * `References`: Cross-platform casing differences between script code and filesystem.
+* **Reset Filters**: Clears all filters and restores the complete issue list.
 
-### 2.5 Panel de Diagnóstico Detallado
-Al seleccionar una fila en la tabla de incidencias, el panel derecho muestra:
-1. **Badge de Severidad e ID de Regla**: Identificador canónico (ej. `RPY-CODE-008`).
-2. **Título del Problema**: Descripción concisa del fallo.
-3. **Ubicación en Disco**: Ruta relativa (`game/script.rpy:L45`) para fácil localización.
-4. **Descripción del Error**: Explicación técnica de la causa del fallo y su impacto en Ren'Py.
-5. **Visor de Código Fuente**: Fragmento de código extraído automáticamente con el error contextualizado en tipografía monoespaciada.
-6. **Acción Recomendada (`💡 RECOMMENDED ACTION`)**: Instrucción precisa de cómo editar el archivo para solucionar el problema.
+### 2.5 Detailed Diagnostics Inspector Pane
+Selecting any issue in the table populates the right-hand panel:
+1. **Severity Badge & Rule ID**: Canonical identifier (e.g., `RPY-CODE-008`).
+2. **Issue Title**: Concise summary of the defect.
+3. **File Location**: Relative path and line number (`game/script.rpy:L45`).
+4. **Description**: In-depth technical explanation of why Ren'Py will fail or misbehave.
+5. **Source Code Snippet**: Extracted source code with syntax highlighting in a monospaced view.
+6. **Recommended Action (`💡 RECOMMENDED ACTION`)**: Direct, actionable instruction on how to resolve the issue.
 
-### 2.6 Exportación de Reportes
-En la esquina superior derecha, dispones de dos botones de exportación:
-* **Export HTML**: Genera un reporte interactivo en un único archivo `.html` (100% autocontenido, zero dependencias externas). Incluye su propio buscador en JavaScript, tarjetas métricas y diseño responsivo para compartir con directores, guionistas o traductores.
-* **Export JSON**: Genera un archivo estructurado `.json` v1.0.0 listo para ingesta en sistemas de QA corporativos, dashboards o scripts personalizados.
+### 2.6 Report Exporting
+Located in the upper right corner of the window:
+* **Export HTML**: Produces an interactive single-file `.html` report (100% self-contained, zero CDN dependencies) with client-side JavaScript search, severity filtering, and dark mode responsive layout.
+* **Export JSON**: Generates a versioned v1.0.0 structured `.json` file for integration with internal QA dashboards or custom analytics tools.
 
 ---
 
-## 3. Uso desde la Línea de Comandos (CLI)
+## 3. Command-Line Interface (CLI) Guide
 
-Ren'Py Inspector cuenta con una interfaz CLI rápida y robusta para terminales (PowerShell, Bash, Zsh) y scripts de automatización:
+Ren'Py Inspector provides a fast, full-featured CLI suitable for automation and continuous integration:
 
-### Comandos Frecuentes
+### Common Commands
 ```bash
-# Inspección estándar de un proyecto
-renpy-inspector "C:/Juegos/MiProyectoRenpy"
+# Standard project inspection
+renpy-inspector "C:/Games/MyRenpyGame"
 
-# Mostrar incidencias de nivel INFO (assets sin uso en disco, etc.)
-renpy-inspector "C:/Juegos/MiProyectoRenpy" --show-info
+# Display INFO severity issues (such as unused assets on disk)
+renpy-inspector "C:/Games/MyRenpyGame" --show-info
 
-# Filtrar por severidad mínima (CRITICAL, ERROR, WARNING, INFO)
-renpy-inspector "C:/Juegos/MiProyectoRenpy" --severity ERROR
+# Filter by minimum severity threshold (CRITICAL, ERROR, WARNING, INFO)
+renpy-inspector "C:/Games/MyRenpyGame" --severity ERROR
 
-# Filtrar por categoría específica (Code, Assets, Translation, etc.)
-renpy-inspector "C:/Juegos/MiProyectoRenpy" --category Code
+# Filter by domain category (Code, Assets, Translation, etc.)
+renpy-inspector "C:/Games/MyRenpyGame" --category Code
 
-# Generar ambos reportes de forma desatendida (HTML interactivo y JSON estructurado)
-renpy-inspector "C:/Juegos/MiProyectoRenpy" --export-html "reports/qa.html" --export-json "reports/qa.json"
+# Export automated standalone HTML and structured JSON reports
+renpy-inspector "C:/Games/MyRenpyGame" --export-html "reports/qa.html" --export-json "reports/qa.json"
 ```
 
-> **Nota de compatibilidad**: Todos los comandos admiten indistintamente tanto el ejecutable directo `renpy-inspector` como la sintaxis `python -m renpy_inspector`.
+> **Compatibility Note**: All options can be run using either the `renpy-inspector` executable or standard Python module syntax `python -m renpy_inspector`.
 
-### Códigos de Salida (Exit Codes para CI/CD)
-* `0`: El proyecto está limpio y no contiene problemas que alcancen el umbral de severidad establecido.
-* `1`: El proyecto contiene uno o más errores de severidad `ERROR` o `CRITICAL` (o problemas que superen el umbral `--severity`), o la ruta especificada no es un proyecto Ren'Py válido.
+### Standard Exit Codes (CI/CD)
+* `0`: Clean project with zero issues meeting or exceeding the configured severity threshold.
+* `1`: The project contains one or more critical errors (or issues meeting the `--severity` threshold), or the target path is not a valid Ren'Py project.
 
 ---
 
-## 4. Catálogo de Reglas Disponibles (20 Reglas Estáticas)
+## 4. Static QA Rules Reference (20 Core Rules)
 
-| Código | Nombre | Severidad | Categoría |
+| Rule ID | Name | Severity | Category |
 | :--- | :--- | :--- | :--- |
 | `RPY-CODE-001` | Broken Jump Target | `ERROR` | Code |
 | `RPY-CODE-002` | Broken Call Target | `ERROR` | Code |
@@ -153,39 +155,39 @@ renpy-inspector "C:/Juegos/MiProyectoRenpy" --export-html "reports/qa.html" --ex
 
 ---
 
-## 5. Configuración Personalizada (`renpy-inspector.toml`)
+## 5. Custom Configuration (`renpy-inspector.toml`)
 
-Puedes personalizar las reglas y el comportamiento del análisis creando un archivo `renpy-inspector.toml` en la raíz de tu juego (o configurando la sección `[tool.renpy-inspector]` en tu `pyproject.toml`):
+You can customize rules and scanner behavior by placing a `renpy-inspector.toml` file in your game root directory (or configuring `[tool.renpy-inspector]` in `pyproject.toml`):
 
 ```toml
 [tool.renpy-inspector]
-# Desactivar reglas que no apliquen a tu proyecto
+# Disable specific rules
 disabled_rules = [
-    "RPY-ASSET-001",  # Omitir aviso de assets no referenciados
+    "RPY-ASSET-001",  # Ignore unreferenced asset candidates
 ]
 
-# Excluir rutas específicas (ej. plantillas o cachés)
+# Ignore specific paths or cache directories
 ignore_patterns = [
     "game/tl/None/**",
     "game/cache/**",
 ]
 
-# Registrar canales de audio personalizados de tu juego
+# Register custom game audio channels
 custom_audio_channels = [
     "ambient",
     "sfx_loop",
 ]
 
-# Sobrescribir la severidad por defecto de ciertas reglas
+# Override rule severity levels
 [tool.renpy-inspector.severity_overrides]
-"RPY-CODE-007" = "ERROR"   # Elevar código inalcanzable a error crítico
+"RPY-CODE-007" = "ERROR"   # Treat unreachable code as critical error
 ```
 
 ---
 
-## 6. Integración en CI/CD (GitHub Actions)
+## 6. Continuous Integration (GitHub Actions)
 
-Para auditar automáticamente cada commit o Pull Request antes de compilar tu juego, crea el archivo `.github/workflows/renpy_inspector.yml`:
+To automatically audit every commit or pull request before publishing your game, create `.github/workflows/renpy_inspector.yml`:
 
 ```yaml
 name: Ren'Py QA Static Inspection
@@ -215,7 +217,7 @@ jobs:
 
     - name: Run Static Analysis
       run: |
-        python -m renpy_inspector . --export-html qa_report.html --export-json qa_report.json
+        renpy-inspector . --export-html qa_report.html --export-json qa_report.json
 
     - name: Upload QA Report Artifacts
       uses: actions/upload-artifact@v4
@@ -229,25 +231,25 @@ jobs:
 
 ---
 
-## 7. Compilación del Ejecutable Standalone para Windows
+## 7. Windows Standalone Executable Compilation
 
-Si deseas compilar tu propio binario `.exe` independiente de Ren'Py Inspector:
+To compile a standalone `.exe` binary on Windows:
 
 ```powershell
-# Compilación con script PowerShell
+# Build with PowerShell script
 powershell -ExecutionPolicy Bypass -File scripts/build_exe.ps1
 
-# O compilación directa con Python
+# Or build directly with Python
 python scripts/build_windows.py
 ```
 
-El binario autocontenido se generará en `dist/RenPyInspector.exe`.
+The resulting standalone executable will be located at `dist/RenPyInspector.exe`.
 
 ---
 
-## 8. Edición para Desarrolladores: Creación de Reglas Personalizadas
+## 8. Developer Edition: Creating Custom Rules
 
-En la **Developer Edition**, puedes añadir reglas in-house adaptadas a la arquitectura de tu estudio creando archivos `.py` en una carpeta de plugins:
+In the **Developer Edition**, studios can implement specialized in-house static analysis rules by placing `.py` files into a plugins directory:
 
 ```python
 from renpy_inspector.core.rules.base import BaseRule
@@ -260,7 +262,7 @@ class RequireMusicVolumeInitRule(BaseRule):
     title = "Default Music Volume Required"
     category = Category.CODE
     default_severity = Severity.WARNING
-    description = "Verifica que el juego defina el volumen por defecto en preferences.rpy."
+    description = "Ensures the game defines default music volume in preferences."
 
     def analyze(self, context) -> list[Issue]:
         issues = []
@@ -271,12 +273,12 @@ class RequireMusicVolumeInitRule(BaseRule):
             loc = Location(file_path="game/options.rpy", line_number=1)
             issues.append(
                 self.create_issue(
-                    message="Variable 'config.default_music_volume' no está definida.",
+                    message="Variable 'config.default_music_volume' is not defined.",
                     location=loc,
-                    suggestion="Añade 'define config.default_music_volume = 0.8' en options.rpy.",
+                    suggestion="Add 'define config.default_music_volume = 0.8' to options.rpy.",
                 )
             )
         return issues
 ```
 
-El cargador dinámico de plugins registrará la clase e integrará la regla en el ciclo de escaneo tanto en la CLI como en la interfaz gráfica.
+The dynamic plugin loader will automatically discover and register your rule, making it available in both the CLI and desktop GUI.
