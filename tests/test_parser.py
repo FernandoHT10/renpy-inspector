@@ -641,3 +641,15 @@ queue sound [ "step1.wav", "step2.wav" ]
     assert res.audios[2].channel == "sound"
     assert res.audios[3].target == "step2.wav"
     assert res.audios[3].channel == "sound"
+
+
+def test_dialogue_with_escaped_quotes():
+    """Test that escaped quotes in dialogue strings preserve enclosed text tags."""
+    script = r'''
+label start:
+    "If you set {b}distribution=\"gaussian\"{/b}, then it works."
+'''
+    res = parse_string(script)
+    assert len(res.dialogues) == 1
+    assert res.dialogues[0].text == r'If you set {b}distribution=\"gaussian\"{/b}, then it works.'
+

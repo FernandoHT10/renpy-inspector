@@ -38,7 +38,9 @@ RE_MENU_ITEM = re.compile(
 RE_SCREEN = re.compile(r"^screen\s+([\w\.]+)(?:\s*\((.*)\))?.*:$", re.UNICODE)
 RE_VARIANT_STMT = re.compile(r'^variant\s+["\'](\w+)["\']', re.UNICODE)
 RE_VARIANT_HEADER = re.compile(r'variant\s*=\s*["\'](\w+)["\']', re.UNICODE)
-RE_QUOTED_STRING = re.compile(r'"([^"]*)"|\'([^\']*)\'', re.UNICODE)
+RE_QUOTED_STRING = re.compile(
+    r'"((?:\\.|[^"\\])*)"|\'((?:\\.|[^\'\\])*)\'', re.UNICODE
+)
 RE_JUMP = re.compile(r"^jump\s+(.+)$", re.UNICODE)
 RE_CALL = re.compile(r"^call\s+(.+)$", re.UNICODE)
 RE_IMAGE_EQUAL = re.compile(r"^image\s+([^=]+)=\s*(.+)$", re.UNICODE)
