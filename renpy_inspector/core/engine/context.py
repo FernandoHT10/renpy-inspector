@@ -98,6 +98,8 @@ class ProjectContext:
     all_calls: list[CallReference] = field(default_factory=list)
     all_images: list[ImageDefinition] = field(default_factory=list)
     all_audios: list[AudioReference] = field(default_factory=list)
+    audio_by_filename: dict[str, AssetInfo] = field(default_factory=dict)
+    audio_by_stem: dict[str, AssetInfo] = field(default_factory=dict)
     all_variables: list[VariableDeclaration] = field(default_factory=list)
     all_translations: list[TranslateBlock] = field(default_factory=list)
     all_python_blocks: list[PythonBlock] = field(default_factory=list)
@@ -253,6 +255,14 @@ class ProjectContext:
                 for part in tag.split():
                     add_token(part)
 
+        # Index audio and video assets by filename and stem for recursive audio lookup
+        for a in self.catalog.get_by_type(AssetType.AUDIO):
+            self.audio_by_filename[a.filename.lower()] = a
+            self.audio_by_stem[Path(a.filename).stem.lower()] = a
+        for a in self.catalog.get_by_type(AssetType.VIDEO):
+            self.audio_by_filename[a.filename.lower()] = a
+            self.audio_by_stem[Path(a.filename).stem.lower()] = a
+
     def has_label(self, label_name: str, scope: Optional[str] = None) -> bool:
         """Check whether a label is defined globally or within scope."""
         if label_name.startswith("."):
@@ -263,7 +273,7 @@ class ProjectContext:
         return label_name in self.defined_labels
 
     def resolve_audio_asset(self, audio_target: str) -> Optional[AssetInfo]:
-        """Resolve audio path looking in game/ and game/audio/ with case tolerance."""
+        """Resolve audio path in game/ and game/audio/ with stem tolerance."""
         clean_target = audio_target.strip("\"'").replace("\\", "/")
         clean_target = re.sub(r"^(<[^>]+>\s*)+", "", clean_target)
 
@@ -287,4 +297,23 @@ class ProjectContext:
             if m.asset_type in (AssetType.AUDIO, AssetType.VIDEO):
                 return m
 
+        # 4. Check recursive search in audio directory by filename or extensionless stem
+        target_name_lower = Path(clean_target).name.lower()
+        target_stem_lower = Path(clean_target).stem.lower()
+
+        found = (
+            self.audio_by_filename.get(target_name_lower)
+            or self.audio_by_stem.get(target_stem_lower)
+        )
+        if found:
+            return found
+
+        # 5. Try common audio extensions if target had no extension or different extension
+        for ext in (".ogg", ".opus", ".mp3", ".wav"):
+            candidate = f"{target_stem_lower}{ext}"
+            found = self.audio_by_filename.get(candidate)
+            if found:
+                return found
+
         return None
+

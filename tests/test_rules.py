@@ -32,6 +32,7 @@ from renpy_inspector.core.rules.code.invalid_init_priority import (
 from renpy_inspector.core.rules.code.unclosed_text_tags import UnclosedTextTagsRule
 from renpy_inspector.core.rules.code.undefined_screen import UndefinedScreenRule
 from renpy_inspector.core.rules.code.unreachable_code import UnreachableCodeRule
+from renpy_inspector.core.rules.code.unused_label import UnusedLabelRule
 from renpy_inspector.core.rules.translation.missing_translation import (
     MissingTranslationRule,
 )
@@ -627,4 +628,81 @@ define 100 safe_flag = False
     assert 1200 in priorities_flagged
 
 
+def test_screen_action_jump_and_call_resolution(tmp_path: Path):
+    scripts = {
+        "screens.rpy": """
+screen main_menu_custom():
+    textbutton "Start Story" action Jump("prologue")
+    textbutton "Tutorial" action Call("intro_tutorial")
+    button action [SetVariable("x", 1), Jump("broken_target")]
+""",
+        "story.rpy": """
+label prologue:
+    "Welcome to the game."
+    return
 
+label intro_tutorial:
+    "This is the tutorial."
+    return
+
+label unused_story:
+    "This is unreferenced."
+    return
+""",
+    }
+    ctx = create_test_context(tmp_path, scripts)
+
+    # 1. Broken Jump should detect broken_target from inside button action
+    jump_rule = BrokenJumpRule()
+    jump_issues = jump_rule.analyze(ctx)
+    assert len(jump_issues) == 1
+    assert jump_issues[0].metadata["target"] == "broken_target"
+
+    # 2. Unused Label should see prologue and intro_tutorial as used, but flag unused_story
+    unused_rule = UnusedLabelRule()
+    unused_issues = unused_rule.analyze(ctx)
+    unused_names = [i.title for i in unused_issues]
+    assert "Unused Label 'unused_story'" in unused_names
+    assert not any("prologue" in name for name in unused_names)
+    assert not any("intro_tutorial" in name for name in unused_names)
+
+
+def test_audio_stem_and_subdirectory_resolution(tmp_path: Path):
+    scripts = {
+        "audio_test.rpy": """
+label start:
+    play sound "cum_01"
+    play music "bgm_forest.ogg"
+    play sound "missing_sfx"
+"""
+    }
+    dummy_assets = [
+        "audio/sound/lewd/cum/cum_01.ogg",
+        "audio/bgm/nature/bgm_forest.ogg",
+    ]
+    ctx = create_test_context(tmp_path, scripts, dummy_assets=dummy_assets)
+    rule = MissingAudioRule()
+    issues = rule.analyze(ctx)
+
+    assert len(issues) == 1
+    assert issues[0].metadata["target"] == "missing_sfx"
+
+
+def test_subfolder_image_alias_resolution(tmp_path: Path):
+    scripts = {
+        "sprites.rpy": """
+image musatobi = "musatobi musatobi_c1"
+image wanda = "wanda c1 wanda_c1"
+image missing_char = "missing unknown_c1"
+"""
+    }
+    dummy_assets = [
+        "images/characters/musatobi/musatobi_c1.webp",
+        "images/characters/wanda/c1/wanda_c1.webp",
+    ]
+    ctx = create_test_context(tmp_path, scripts, dummy_assets=dummy_assets)
+    rule = MissingImageRule()
+    issues = rule.analyze(ctx)
+
+    assert len(issues) == 1
+    assert issues[0].metadata["image_name"] == "missing_char"

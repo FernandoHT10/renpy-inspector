@@ -82,6 +82,20 @@ RE_SELF_CLOSING_TEXT_TAG = re.compile(
     r"(?:renpy\.)?config\.self_closing_custom_text_tags\s*\[\s*['\"]([\w]+)['\"]\s*\]",
     re.UNICODE,
 )
+RE_ACTION_JUMP = re.compile(
+    r"\b(?:Jump|renpy\.jump)\s*\(\s*['\"]([\w\.]+)['\"]\s*\)", re.UNICODE
+)
+RE_ACTION_CALL = re.compile(
+    r"\b(?:Call|renpy\.call|renpy\.call_in_new_context)\s*\(\s*['\"]([\w\.]+)['\"]\s*\)",
+    re.UNICODE,
+)
+RE_ACTION_START = re.compile(
+    r"\bStart\s*\(\s*['\"]([\w\.]+)['\"]\s*\)", re.UNICODE
+)
+RE_ACTION_SCREEN = re.compile(
+    r"\b(Show|Hide|ToggleScreen|ShowTransient|CallScreen|renpy\.show_screen|renpy\.hide_screen)\s*\(\s*['\"]([\w\.]+)['\"]\s*\)",
+    re.UNICODE,
+)
 
 
 def unquote_string(text: str) -> Optional[str]:
@@ -168,6 +182,40 @@ class RpyParser:
                                     result.custom_text_tags.append(m_ct.group(1))
                                 for m_sc in RE_SELF_CLOSING_TEXT_TAG.finditer(line.stripped_code):
                                     result.custom_self_closing_text_tags.append(m_sc.group(1))
+                            code_py = line.stripped_code
+                            if ("Jump" in code_py or "renpy.jump" in code_py) and "(" in code_py:
+                                for m_jump in RE_ACTION_JUMP.finditer(code_py):
+                                    result.jumps.append(
+                                        JumpReference(
+                                            target=m_jump.group(1).strip(),
+                                            location=Location(
+                                                file_path=line.file_path,
+                                                line_number=line.line_number,
+                                                column_number=line.column,
+                                                source_snippet=line.raw_text.strip(),
+                                            ),
+                                            is_expression=False,
+                                            kind=ReferenceKind.STATIC,
+                                            scope_label=current_global_label,
+                                        )
+                                    )
+                            if ("Call" in code_py or "renpy.call" in code_py) and "(" in code_py:
+                                for m_call in RE_ACTION_CALL.finditer(code_py):
+                                    result.calls.append(
+                                        CallReference(
+                                            target=m_call.group(1).strip(),
+                                            location=Location(
+                                                file_path=line.file_path,
+                                                line_number=line.line_number,
+                                                column_number=line.column,
+                                                source_snippet=line.raw_text.strip(),
+                                            ),
+                                            is_expression=False,
+                                            kind=ReferenceKind.STATIC,
+                                            is_screen=False,
+                                            scope_label=current_global_label,
+                                        )
+                                    )
                         continue
                     else:
                         # Indentation returned to outer scope; finalize Python block
@@ -288,6 +336,96 @@ class RpyParser:
                         source_snippet=line.raw_text.strip(),
                     )
                     active_menu_item_count = 0
+
+                # Screen actions / button actions (Jump, Call, Start, Show, Hide, etc.)
+                has_action_keyword = any(
+                    k in code
+                    for k in (
+                        "Jump",
+                        "Call",
+                        "Start",
+                        "Show",
+                        "Hide",
+                        "ToggleScreen",
+                        "ShowTransient",
+                        "CallScreen",
+                        "renpy.jump",
+                        "renpy.call",
+                        "show_screen",
+                        "hide_screen",
+                    )
+                )
+                if has_action_keyword and "(" in code:
+                    loc = Location(
+                        file_path=line.file_path,
+                        line_number=line.line_number,
+                        column_number=line.column,
+                        source_snippet=line.raw_text.strip(),
+                    )
+                    if "Jump" in code or "renpy.jump" in code:
+                        for m_jump in RE_ACTION_JUMP.finditer(code):
+                            result.jumps.append(
+                                JumpReference(
+                                    target=m_jump.group(1).strip(),
+                                    location=loc,
+                                    is_expression=False,
+                                    kind=ReferenceKind.STATIC,
+                                    scope_label=current_global_label,
+                                )
+                            )
+                    if "Start" in code:
+                        for m_start in RE_ACTION_START.finditer(code):
+                            result.jumps.append(
+                                JumpReference(
+                                    target=m_start.group(1).strip(),
+                                    location=loc,
+                                    is_expression=False,
+                                    kind=ReferenceKind.STATIC,
+                                    scope_label=current_global_label,
+                                )
+                            )
+                    if "Call" in code or "renpy.call" in code:
+                        for m_call in RE_ACTION_CALL.finditer(code):
+                            result.calls.append(
+                                CallReference(
+                                    target=m_call.group(1).strip(),
+                                    location=loc,
+                                    is_expression=False,
+                                    kind=ReferenceKind.STATIC,
+                                    is_screen=False,
+                                    scope_label=current_global_label,
+                                )
+                            )
+                    if any(
+                        s in code
+                        for s in (
+                            "Show",
+                            "Hide",
+                            "ToggleScreen",
+                            "ShowTransient",
+                            "CallScreen",
+                            "show_screen",
+                            "hide_screen",
+                        )
+                    ):
+                        for m_scr in RE_ACTION_SCREEN.finditer(code):
+                            act_name = (
+                                m_scr.group(1)
+                                .replace("renpy.", "")
+                                .replace("_screen", "")
+                                .lower()
+                            )
+                            result.calls.append(
+                                CallReference(
+                                    target=m_scr.group(2).strip(),
+                                    location=loc,
+                                    is_expression=False,
+                                    kind=ReferenceKind.STATIC,
+                                    is_screen=True,
+                                    screen_action=act_name,
+                                    scope_label=current_global_label,
+                                )
+                            )
 
                 # Fast keyword check: skip regex matching on dialogue / non-statements
                 if not code.startswith((

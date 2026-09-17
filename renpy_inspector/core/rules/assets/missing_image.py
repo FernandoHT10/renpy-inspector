@@ -24,11 +24,18 @@ class MissingImageRule(BaseRule):
             stem = Path(img_asset.filename).stem
             defined_image_names.add(stem)
             defined_image_names.add(stem.replace("_", " "))
-            if img_asset.relative_path.lower().startswith("images/"):
-                sub_path = img_asset.relative_path[7:]
-                sub_stem = str(Path(sub_path).with_suffix("")).replace("\\", "/")
-                defined_image_names.add(sub_stem)
-                defined_image_names.add(sub_stem.replace("/", " ").replace("_", " "))
+
+            # Index subdirectory slices (e.g. characters/musatobi/c1 -> musatobi c1)
+            rel = Path(img_asset.relative_path)
+            parts = list(rel.parts)
+            parts[-1] = stem
+            for i in range(len(parts)):
+                sub_space = " ".join(parts[i:])
+                defined_image_names.add(sub_space)
+                defined_image_names.add(sub_space.replace("_", " "))
+                sub_slash = "/".join(parts[i:])
+                defined_image_names.add(sub_slash)
+                defined_image_names.add(sub_slash.replace("_", " "))
 
         common_image_extensions = (".png", ".jpg", ".jpeg", ".webp", ".webm", ".ogv")
 
