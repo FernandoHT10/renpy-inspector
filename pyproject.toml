@@ -4,14 +4,35 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "renpy-inspector"
-version = "0.1.0"
-description = "Professional static code analysis and QA inspector for Ren'Py projects"
+version = "1.0.0"
+description = "Professional static code analysis and QA inspector for Ren'Py visual novels"
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["renpy", "visual-novel", "static-analysis", "linter", "qa", "game-development"]
 authors = [
     { name = "Ren'Py Inspector Team" }
 ]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Games/Entertainment",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/FernandoHT10/renpy-inspector"
+Documentation = "https://github.com/FernandoHT10/renpy-inspector/blob/main/USER_GUIDE.md"
+Issues = "https://github.com/FernandoHT10/renpy-inspector/issues"
 
 [project.optional-dependencies]
 dev = [
