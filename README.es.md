@@ -41,7 +41,7 @@ Para una guía paso a paso, consulta el [Manual de Usuario (USER_GUIDE.es.md)](U
 * **Tabla Interactiva de Incidencias**: Visualización ordenada por severidad, ID de regla, título, ubicación relativa en disco (`game/...:LXX`) y categoría, con selección vinculada.
 * **Panel Lateral de Diagnóstico Detallado**:
   * Visualizador monoespaciado de fragmentos de código fuente original con el error exacto resaltado.
-  * Caja de **Acción Recomendada** (`💡 RECOMMENDED ACTION`) con instrucciones precisas para solucionar cada fallo.
+  * Caja de **Acción Recomendada** (`RECOMMENDED ACTION`) con instrucciones precisas para solucionar cada fallo.
   * Metadatos de regla, categoría y ubicación exacta.
 * **Worker Asíncrono no Bloqueante (`QThread`)**: Barra de progreso continua con actualización en tiempo real del porcentaje y el nombre de cada una de las 20 reglas evaluadas paso a paso.
 * **Exportación Directa en 1 Clic**: Botones nativos para guardar reportes en HTML interactivo y JSON estructurado sin salir de la GUI.
