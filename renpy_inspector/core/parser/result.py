@@ -8,6 +8,7 @@ from renpy_inspector.core.models.symbols import (
     CallReference,
     DialogueLine,
     ImageDefinition,
+    InitStatement,
     JumpReference,
     LabelSymbol,
     MenuBlock,
@@ -40,6 +41,9 @@ class FileParseResult:
     unreachables: list[UnreachableStatement] = field(default_factory=list)
     scenes_and_shows: list[str] = field(default_factory=list)
     registered_channels: list[str] = field(default_factory=list)
+    init_statements: list[InitStatement] = field(default_factory=list)
+    custom_text_tags: list[str] = field(default_factory=list)
+    custom_self_closing_text_tags: list[str] = field(default_factory=list)
     errors: list[ParseError] = field(default_factory=list)
 
 

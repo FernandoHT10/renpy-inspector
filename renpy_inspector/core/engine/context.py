@@ -14,6 +14,7 @@ from renpy_inspector.core.models.symbols import (
     CallReference,
     DialogueLine,
     ImageDefinition,
+    InitStatement,
     JumpReference,
     LabelSymbol,
     MenuBlock,
@@ -126,6 +127,9 @@ class ProjectContext:
     script_token_pool: set[str] = field(default_factory=set)
     # Audio channels explicitly registered via renpy.music.register_channel
     registered_audio_channels: set[str] = field(default_factory=set)
+    all_init_statements: list[InitStatement] = field(default_factory=list)
+    custom_text_tags: set[str] = field(default_factory=set)
+    custom_self_closing_text_tags: set[str] = field(default_factory=set)
 
     @classmethod
     def build(
@@ -213,6 +217,9 @@ class ProjectContext:
             self.all_menus.extend(file_result.menus)
             self.all_dialogues.extend(file_result.dialogues)
             self.all_unreachables.extend(file_result.unreachables)
+            self.all_init_statements.extend(file_result.init_statements)
+            self.custom_text_tags.update(file_result.custom_text_tags)
+            self.custom_self_closing_text_tags.update(file_result.custom_self_closing_text_tags)
 
             # Index define and default
             for var in file_result.variables:

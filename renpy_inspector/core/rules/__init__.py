@@ -17,6 +17,7 @@ from renpy_inspector.core.rules.code import (
     DuplicateLabelRule,
     DuplicateScreenRule,
     EmptyMenuRule,
+    InvalidInitPriorityRule,
     ShadowBuiltinRule,
     UnclosedTextTagsRule,
     UndefinedScreenRule,
@@ -48,6 +49,7 @@ def get_default_rules() -> list[BaseRule]:
         EmptyMenuRule(),
         DuplicateScreenRule(),
         UnclosedTextTagsRule(),
+        InvalidInitPriorityRule(),
     ]
 
 
@@ -72,5 +74,6 @@ __all__ = [
     "EmptyMenuRule",
     "DuplicateScreenRule",
     "UnclosedTextTagsRule",
+    "InvalidInitPriorityRule",
     "get_default_rules",
 ]

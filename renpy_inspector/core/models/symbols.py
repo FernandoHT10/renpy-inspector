@@ -78,6 +78,7 @@ class CallReference:
     is_expression: bool = False
     kind: ReferenceKind = ReferenceKind.STATIC
     is_screen: bool = False
+    screen_action: Optional[str] = None
     scope_label: Optional[str] = None
 
     def __post_init__(self) -> None:
@@ -93,6 +94,7 @@ class CallReference:
             "is_expression": self.is_expression,
             "kind": self.kind.value,
             "is_screen": self.is_screen,
+            "screen_action": self.screen_action,
             "scope_label": self.scope_label,
         }
 
@@ -311,5 +313,22 @@ class UnreachableStatement:
             "preceding_statement": self.preceding_statement,
             "preceding_line": self.preceding_line,
         }
+
+
+@dataclass(frozen=True)
+class InitStatement:
+    """Represents an init statement or block with an explicit priority."""
+
+    priority: int
+    statement_type: str  # "init", "init python", "init offset"
+    location: Location
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "priority": self.priority,
+            "statement_type": self.statement_type,
+            "location": self.location.to_dict(),
+        }
+
 
 

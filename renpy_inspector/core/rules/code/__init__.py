@@ -9,6 +9,9 @@ from renpy_inspector.core.rules.code.define_persistent import DefinePersistentRu
 from renpy_inspector.core.rules.code.duplicate_label import DuplicateLabelRule
 from renpy_inspector.core.rules.code.duplicate_screen import DuplicateScreenRule
 from renpy_inspector.core.rules.code.empty_menu import EmptyMenuRule
+from renpy_inspector.core.rules.code.invalid_init_priority import (
+    InvalidInitPriorityRule,
+)
 from renpy_inspector.core.rules.code.shadow_builtin import ShadowBuiltinRule
 from renpy_inspector.core.rules.code.unclosed_text_tags import UnclosedTextTagsRule
 from renpy_inspector.core.rules.code.undefined_screen import UndefinedScreenRule
@@ -28,4 +31,5 @@ __all__ = [
     "EmptyMenuRule",
     "DuplicateScreenRule",
     "UnclosedTextTagsRule",
+    "InvalidInitPriorityRule",
 ]

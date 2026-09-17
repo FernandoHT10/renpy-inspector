@@ -12,6 +12,7 @@ from renpy_inspector.core.models.symbols import (
     CallReference,
     DialogueLine,
     ImageDefinition,
+    InitStatement,
     JumpReference,
     LabelSymbol,
     MenuBlock,
@@ -61,10 +62,26 @@ RE_DEFINE_DEFAULT = re.compile(
     r"^(define|default)(\s+-?\d+)?\s+([\w\.]+)\s*=\s*(.*)$", re.UNICODE
 )
 RE_TRANSLATE = re.compile(r"^translate\s+([\w]+)\s+([^:]+):$", re.UNICODE)
-RE_PYTHON_BLOCK = re.compile(r"^(init\s+(-?\d+\s+)?)*python(\s+(early|hide))?\s*:$", re.UNICODE)
+RE_PYTHON_BLOCK = re.compile(
+    r"^(?:init(?:\s+-?\d+)?\s+)?python(?:\s+(?:early|hide))?(?:\s+in\s+[\w\.]+)?\s*:$",
+    re.UNICODE,
+)
+RE_INIT_STMT = re.compile(
+    r"^init(?:\s+(-?\d+))?(?:\s+python(?:\s+(?:early|hide))?(?:\s+in\s+[\w\.]+)*)?\s*:$",
+    re.UNICODE,
+)
+RE_INIT_OFFSET = re.compile(r"^init\s+offset\s*=\s*(-?\d+)", re.UNICODE)
 RE_SCENE_SHOW = re.compile(r"^(scene|show)\s+([^:\n\r]+)", re.UNICODE)
 RE_SHOW_SCREEN = re.compile(r"^(show|hide)\s+screen\s+([\w\.]+)(.*)$", re.UNICODE)
 RE_REGISTER_CHANNEL = re.compile(r"register_channel\s*\(\s*[\"']([\w]+)[\"']", re.UNICODE)
+RE_CUSTOM_TEXT_TAG = re.compile(
+    r"(?:renpy\.)?config\.custom_text_tags\s*\[\s*['\"]([\w]+)['\"]\s*\]",
+    re.UNICODE,
+)
+RE_SELF_CLOSING_TEXT_TAG = re.compile(
+    r"(?:renpy\.)?config\.self_closing_custom_text_tags\s*\[\s*['\"]([\w]+)['\"]\s*\]",
+    re.UNICODE,
+)
 
 
 def unquote_string(text: str) -> Optional[str]:
@@ -146,6 +163,11 @@ class RpyParser:
                                 m_reg = RE_REGISTER_CHANNEL.search(line.stripped_code)
                                 if m_reg:
                                     result.registered_channels.append(m_reg.group(1))
+                            if "custom_text_tags" in line.stripped_code:
+                                for m_ct in RE_CUSTOM_TEXT_TAG.finditer(line.stripped_code):
+                                    result.custom_text_tags.append(m_ct.group(1))
+                                for m_sc in RE_SELF_CLOSING_TEXT_TAG.finditer(line.stripped_code):
+                                    result.custom_self_closing_text_tags.append(m_sc.group(1))
                         continue
                     else:
                         # Indentation returned to outer scope; finalize Python block
@@ -258,7 +280,7 @@ class RpyParser:
                     "label", "screen", "jump", "call", "image", "play", "queue",
                     "define", "default", "translate", "scene", "show", "hide",
                     "init", "python", "$", "menu", "voice", "layeredimage", "return"
-                )) and "register_channel" not in code:
+                )) and "register_channel" not in code and "custom_text_tags" not in code:
                     continue
 
                 if "register_channel" in code:
@@ -266,8 +288,54 @@ class RpyParser:
                     if m_reg:
                         result.registered_channels.append(m_reg.group(1))
 
+                if "custom_text_tags" in code:
+                    for m_ct in RE_CUSTOM_TEXT_TAG.finditer(code):
+                        result.custom_text_tags.append(m_ct.group(1))
+                    for m_sc in RE_SELF_CLOSING_TEXT_TAG.finditer(code):
+                        result.custom_self_closing_text_tags.append(m_sc.group(1))
+
+                # Init offset statement: e.g. "init offset = -2"
+                if code.startswith("init offset"):
+                    m_off = RE_INIT_OFFSET.match(code)
+                    if m_off:
+                        offset_val = int(m_off.group(1))
+                        result.init_statements.append(
+                            InitStatement(
+                                priority=offset_val,
+                                statement_type="init offset",
+                                location=Location(
+                                    file_path=line.file_path,
+                                    line_number=line.line_number,
+                                    column_number=line.column,
+                                    source_snippet=line.raw_text.strip(),
+                                ),
+                            )
+                        )
+                        continue
+
+                # Init blocks: "init ...:" or "init python ...:"
+                if code.startswith("init") and code.endswith(":"):
+                    m_init = RE_INIT_STMT.match(code)
+                    if m_init:
+                        priority_str = m_init.group(1)
+                        if priority_str is not None:
+                            p_val = int(priority_str)
+                            stmt_type = "init python" if "python" in code else "init"
+                            result.init_statements.append(
+                                InitStatement(
+                                    priority=p_val,
+                                    statement_type=stmt_type,
+                                    location=Location(
+                                        file_path=line.file_path,
+                                        line_number=line.line_number,
+                                        column_number=line.column,
+                                        source_snippet=line.raw_text.strip(),
+                                    ),
+                                )
+                            )
+
                 # 3. Detect Python block start
-                if code.startswith(("python", "init ")) and RE_PYTHON_BLOCK.match(code):
+                if code.startswith(("python", "init")) and RE_PYTHON_BLOCK.match(code):
                     block_type = code.rstrip(":").strip()
                     active_python_block = PythonBlock(
                         block_type=block_type,
@@ -416,6 +484,7 @@ class RpyParser:
                                     is_expression=False,
                                     kind=ReferenceKind.STATIC,
                                     is_screen=True,
+                                    screen_action="call",
                                     scope_label=current_global_label,
                                 )
                             )
@@ -692,6 +761,7 @@ class RpyParser:
                 if code.startswith(("show screen ", "hide screen ")):
                     m_scr = RE_SHOW_SCREEN.match(code)
                     if m_scr:
+                        action_name = m_scr.group(1).lower()
                         screen_name = m_scr.group(2).strip()
                         for clause in (" with ", " nopredict", " pass", " as ", " onlayer ", "("):
                             if clause in screen_name:
@@ -709,6 +779,7 @@ class RpyParser:
                                     is_expression=False,
                                     kind=ReferenceKind.STATIC,
                                     is_screen=True,
+                                    screen_action=action_name,
                                     scope_label=current_global_label,
                                 )
                             )

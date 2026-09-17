@@ -43,6 +43,9 @@ class UnclosedTextTagsRule(BaseRule):
 
     def analyze(self, context: ProjectContext) -> list[Issue]:
         issues: list[Issue] = []
+        effective_paired = (PAIRED_TAGS | {t.lower() for t in context.custom_text_tags}) - {
+            t.lower() for t in context.custom_self_closing_text_tags
+        }
 
         for diag in context.all_dialogues:
             text = diag.text
@@ -54,13 +57,13 @@ class UnclosedTextTagsRule(BaseRule):
                 raw_tag = tag_match.group(1).lower()
                 if raw_tag.startswith("/"):
                     closing = raw_tag[1:]
-                    if closing in PAIRED_TAGS:
+                    if closing in effective_paired:
                         if stack and stack[-1] == closing:
                             stack.pop()
                         elif closing in stack:
                             stack.remove(closing)
                 else:
-                    if raw_tag in PAIRED_TAGS:
+                    if raw_tag in effective_paired:
                         stack.append(raw_tag)
 
             if stack:

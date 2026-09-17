@@ -26,7 +26,11 @@ from renpy_inspector.core.rules.code.define_persistent import DefinePersistentRu
 from renpy_inspector.core.rules.code.duplicate_label import DuplicateLabelRule
 from renpy_inspector.core.rules.code.duplicate_screen import DuplicateScreenRule
 from renpy_inspector.core.rules.code.empty_menu import EmptyMenuRule
+from renpy_inspector.core.rules.code.invalid_init_priority import (
+    InvalidInitPriorityRule,
+)
 from renpy_inspector.core.rules.code.unclosed_text_tags import UnclosedTextTagsRule
+from renpy_inspector.core.rules.code.undefined_screen import UndefinedScreenRule
 from renpy_inspector.core.rules.code.unreachable_code import UnreachableCodeRule
 from renpy_inspector.core.rules.translation.missing_translation import (
     MissingTranslationRule,
@@ -339,7 +343,7 @@ label start:
     ctx = create_test_context(tmp_path, scripts)
 
     registry = RuleRegistry.create_default()
-    assert len(registry.get_all_rules()) == 19
+    assert len(registry.get_all_rules()) == 20
 
     # Test disabling BrokenJumpRule
     registry.set_enabled("RPY-CODE-001", False)
@@ -536,5 +540,91 @@ label start:
     tags_found = [i.metadata["unclosed_tags"] for i in issues]
     assert ["b"] in tags_found
     assert ["size"] in tags_found
+
+
+def test_screen_action_in_undefined_screen_rule(tmp_path: Path):
+    scripts = {
+        "screens_test.rpy": """
+label start:
+    call screen missing_screen_a
+    show screen missing_screen_b
+    hide screen missing_screen_c
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = UndefinedScreenRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 3
+    assert any("via 'call screen'" in i.message and "missing_screen_a" in i.message for i in issues)
+    assert any("via 'show screen'" in i.message and "missing_screen_b" in i.message for i in issues)
+    assert any("via 'hide screen'" in i.message and "missing_screen_c" in i.message for i in issues)
+
+
+def test_custom_text_tags_dynamic_rule(tmp_path: Path):
+    scripts = {
+        "kinetic.rpy": """
+init python:
+    config.custom_text_tags["bounce"] = None
+    config.self_closing_custom_text_tags["tagbr"] = None
+
+label start:
+    "Text with {bounce}bouncing{/bounce} effect."
+    "Text with {bounce}broken bouncing tag without close."
+    "Self closing {tagbr} works without tag closure."
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    assert "bounce" in ctx.custom_text_tags
+    assert "tagbr" in ctx.custom_self_closing_text_tags
+
+    rule = UnclosedTextTagsRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 1
+    assert issues[0].rule_id == "RPY-TEXT-001"
+    assert issues[0].metadata["unclosed_tags"] == ["bounce"]
+
+
+def test_invalid_init_priority_rule(tmp_path: Path):
+    scripts = {
+        "inits.rpy": """
+init -1000:
+    transform t1:
+        pass
+
+init 1434:
+    pass
+
+init -9999 python:
+    pass
+
+init offset = -1005
+
+define 1200 special_flag = True
+
+# Valid priorities should NOT produce issues
+init -999:
+    pass
+
+init 999 python:
+    pass
+
+init offset = -2
+
+define 100 safe_flag = False
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = InvalidInitPriorityRule()
+    issues = rule.analyze(ctx)
+
+    assert len(issues) == 5
+    assert all(i.rule_id == "RPY-CODE-010" for i in issues)
+    priorities_flagged = [i.metadata["priority"] for i in issues]
+    assert -1000 in priorities_flagged
+    assert 1434 in priorities_flagged
+    assert -9999 in priorities_flagged
+    assert -1005 in priorities_flagged
+    assert 1200 in priorities_flagged
+
 
 

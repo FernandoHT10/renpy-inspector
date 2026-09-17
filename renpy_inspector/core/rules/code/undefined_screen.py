@@ -16,7 +16,8 @@ class UndefinedScreenRule(Rule):
     category = Category.CODE
     default_severity = Severity.ERROR
     description = (
-        "Checks that screen names invoked via 'call screen' exist in the project or builtins."
+        "Checks that screen names referenced via screen statements "
+        "('call screen', 'show screen', 'hide screen') exist in the project or builtins."
     )
 
     def analyze(self, context: ProjectContext) -> List[Issue]:
@@ -31,6 +32,11 @@ class UndefinedScreenRule(Rule):
                 continue
 
             if screen_name not in context.defined_screens:
+                action_desc = (
+                    f"'{call.screen_action} screen'"
+                    if call.screen_action
+                    else "'screen statement'"
+                )
                 issues.append(
                     Issue.create(
                         rule_id=self.rule_id,
@@ -38,7 +44,7 @@ class UndefinedScreenRule(Rule):
                         category=self.category,
                         title=f"Undefined Screen '{screen_name}'",
                         message=(
-                            f"Screen '{screen_name}' invoked via 'call screen' is not defined "
+                            f"Screen '{screen_name}' referenced via {action_desc} is not defined "
                             "in any script file or Ren'Py standard screens."
                         ),
                         location=call.location,

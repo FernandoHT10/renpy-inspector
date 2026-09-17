@@ -10,6 +10,7 @@ from renpy_inspector.core.models.symbols import (
     CallReference,
     ImageDefinition,
     ImageSymbol,
+    InitStatement,
     JumpReference,
     LabelSymbol,
     PythonBlock,
@@ -40,4 +41,5 @@ __all__ = [
     "PythonBlock",
     "ReferenceKind",
     "ScreenDefinition",
+    "InitStatement",
 ]
