@@ -31,7 +31,10 @@ from renpy_inspector.core.parser.source import SourceFile, SourceLoader
 # Regex patterns for Ren'Py statements (using Unicode-aware word matching)
 RE_LABEL = re.compile(r"^label\s+([\w\.]+)(?:\s*\((.*)\))?\s*:$", re.UNICODE)
 RE_MENU = re.compile(r"^menu\s+([\w\.]+)(?:\s*\((.*)\))?\s*:$", re.UNICODE)
-RE_MENU_ITEM = re.compile(r'^(?:"([^"]+)"|\'([^\']+)\')(?:\s+if\s+.*)?\s*:$', re.UNICODE)
+RE_MENU_ITEM = re.compile(
+    r'^(?:"([^"]+)"|\'([^\']+)\')(?:\s*\(.*?\))?(?:\s+if\s+.*)?\s*:$',
+    re.UNICODE,
+)
 RE_SCREEN = re.compile(r"^screen\s+([\w\.]+)(?:\s*\((.*)\))?.*:$", re.UNICODE)
 RE_VARIANT_STMT = re.compile(r'^variant\s+["\'](\w+)["\']', re.UNICODE)
 RE_VARIANT_HEADER = re.compile(r'variant\s*=\s*["\'](\w+)["\']', re.UNICODE)
@@ -166,8 +169,13 @@ class RpyParser:
         python_block_indent: int = 0
         last_python_line_num: int = 0
 
-        for line in lines:
+        skip_until_idx: int = -1
+
+        for line_idx, line in enumerate(lines):
             try:
+                if line_idx < skip_until_idx:
+                    continue
+
                 # 1. Check if we are inside a Python block
                 if active_python_block is not None:
                     if line.is_empty or line.indent > python_block_indent:
@@ -506,11 +514,29 @@ class RpyParser:
                 # 4. Labels & Named Menus (ignore UI label inside screens)
                 is_label_or_menu = code.startswith("label ") or code.startswith("menu ")
                 if is_label_or_menu and active_screen_indent is None:
+                    is_menu_def = code.startswith("menu ")
                     m_label = (
                         RE_LABEL.match(code)
-                        if code.startswith("label ")
+                        if not is_menu_def
                         else RE_MENU.match(code)
                     )
+                    if not m_label and not code.endswith(":") and "(" in code:
+                        # Multiline signature
+                        parts = [code]
+                        for k in range(line_idx + 1, len(lines)):
+                            next_l = lines[k]
+                            if not next_l.is_empty:
+                                parts.append(next_l.stripped_code)
+                                if next_l.stripped_code.endswith(":"):
+                                    skip_until_idx = k + 1
+                                    break
+                        accumulated = " ".join(parts)
+                        m_label = (
+                            RE_LABEL.match(accumulated)
+                            if not is_menu_def
+                            else RE_MENU.match(accumulated)
+                        )
+
                     if m_label:
                         label_name = m_label.group(1)
                         if label_name == "_":
@@ -535,6 +561,7 @@ class RpyParser:
                                 is_local=is_local,
                                 parent_label=parent_lbl,
                                 params=params.strip() if params else None,
+                                is_menu=is_menu_def,
                             )
                         )
                         continue
@@ -542,14 +569,32 @@ class RpyParser:
                 # 4b. Screens
                 if code.startswith("screen "):
                     m_screen = RE_SCREEN.match(code)
+                    var_header = None
+                    if not m_screen and not code.endswith(":") and "(" in code:
+                        # Multiline screen parameter signature
+                        parts = [code]
+                        for k in range(line_idx + 1, len(lines)):
+                            next_l = lines[k]
+                            if not next_l.is_empty:
+                                parts.append(next_l.stripped_code)
+                                if next_l.stripped_code.endswith(":"):
+                                    skip_until_idx = k + 1
+                                    break
+                        accumulated = " ".join(parts)
+                        m_screen = RE_SCREEN.match(accumulated)
+                        if m_screen:
+                            m_vh = RE_VARIANT_HEADER.search(accumulated)
+                            if m_vh:
+                                var_header = m_vh.group(1).strip()
+
                     if m_screen:
                         screen_name = m_screen.group(1).strip()
                         params = m_screen.group(2)
                         active_screen_indent = line.indent
-                        var_header = None
-                        m_vh = RE_VARIANT_HEADER.search(code)
-                        if m_vh:
-                            var_header = m_vh.group(1).strip()
+                        if var_header is None:
+                            m_vh = RE_VARIANT_HEADER.search(code)
+                            if m_vh:
+                                var_header = m_vh.group(1).strip()
                         result.screens.append(
                             ScreenDefinition(
                                 name=screen_name,

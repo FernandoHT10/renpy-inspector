@@ -30,8 +30,13 @@ class UnusedLabelRule(Rule):
         targeted = jump_targets | call_targets
 
         for name, label_list in context.labels_by_name.items():
-            # Skip builtins, private labels, and local sub-labels
-            if name in BUILTIN_RENPY_LABELS or name.startswith("_") or name.startswith("."):
+            # Skip builtins, private labels, local sub-labels, and inline named menus
+            if (
+                name in BUILTIN_RENPY_LABELS
+                or name.startswith("_")
+                or name.startswith(".")
+                or all(lbl.is_menu for lbl in label_list)
+            ):
                 continue
 
             # If referenced via jump/call or present in script token pool (e.g. actions, renpy.jump)

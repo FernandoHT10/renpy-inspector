@@ -23,6 +23,7 @@ class LabelSymbol:
     is_local: bool = False
     parent_label: Optional[str] = None
     params: Optional[str] = None
+    is_menu: bool = False
 
     @property
     def full_name(self) -> str:
@@ -39,6 +40,7 @@ class LabelSymbol:
             "is_local": self.is_local,
             "parent_label": self.parent_label,
             "params": self.params,
+            "is_menu": self.is_menu,
         }
 
 

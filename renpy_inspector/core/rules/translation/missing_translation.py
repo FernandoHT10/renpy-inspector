@@ -21,10 +21,11 @@ class MissingTranslationRule(BaseRule):
     def analyze(self, context: ProjectContext) -> list[Issue]:
         issues: list[Issue] = []
 
-        # Only evaluate if there are at least two target languages with translations
+        # Ignore base language None and placeholder translation templates
+        template_languages = {"none", "yourlanguage", "template", "example", "sample"}
         real_languages = [
             lang for lang in context.translations_by_lang.keys()
-            if lang.lower() != "none"
+            if lang.lower() not in template_languages
         ]
 
         if len(real_languages) < 2:

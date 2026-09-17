@@ -706,3 +706,92 @@ image missing_char = "missing unknown_c1"
 
     assert len(issues) == 1
     assert issues[0].metadata["image_name"] == "missing_char"
+
+
+def test_menu_item_with_arguments_not_empty(tmp_path: Path):
+    scripts = {
+        "menu_test.rpy": """
+label start:
+    menu hahari_brothel_menu:
+        "Sex"(sensitive=hahari_date == True):
+            jump hahari_brothel_sex
+        "Peeks" (sensitive=hahari_chat >= 25):
+            jump hahari_brothel_peeks
+        "Back":
+            return
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = EmptyMenuRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 0
+
+
+def test_inline_named_menu_not_flagged_unused(tmp_path: Path):
+    scripts = {
+        "story.rpy": """
+label start:
+    "Dialogue before choice."
+    menu inline_choice_menu:
+        "Yes":
+            "You said yes."
+        "No":
+            "You said no."
+    return
+
+label real_unused_label:
+    "This is actually unused."
+    return
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = UnusedLabelRule()
+    issues = rule.analyze(ctx)
+    unused_names = [i.title for i in issues]
+    assert "Unused Label 'real_unused_label'" in unused_names
+    assert not any("inline_choice_menu" in name for name in unused_names)
+
+
+def test_multiline_screen_signature_parsed(tmp_path: Path):
+    scripts = {
+        "multiline_ui.rpy": """
+screen minigame_crafting_ui(
+    var_typ="cooking",
+    var_crf=["hero"],
+    show_prep=True,
+):
+    default started = True
+    text "Crafting..."
+
+label start:
+    call screen minigame_crafting_ui
+    return
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    assert "minigame_crafting_ui" in ctx.defined_screens
+
+    rule = UndefinedScreenRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 0
+
+
+def test_template_language_excluded_from_missing_translation(tmp_path: Path):
+    scripts = {
+        "story.rpy": """
+label start:
+    "Welcome to the game."
+""",
+        "tl/es/story.rpy": """
+translate es start_12345678:
+    "Bienvenido al juego."
+""",
+        "tl/YourLanguage/story.rpy": """
+# Empty template placeholder for community translators
+""",
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = MissingTranslationRule()
+    issues = rule.analyze(ctx)
+    assert not any(i.metadata.get("language") == "YourLanguage" for i in issues)
+
