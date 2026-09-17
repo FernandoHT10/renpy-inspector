@@ -46,7 +46,7 @@ class FilterBar(QWidget):
         self.category_combo = QComboBox()
         self.category_combo.addItem("All Categories", userData=None)
         for cat in Category:
-            self.category_combo.addItem(cat.value.capitalize(), userData=cat)
+            self.category_combo.addItem(cat.value, userData=cat)
         self.category_combo.currentIndexChanged.connect(self._emit_change)
 
         # Reset button

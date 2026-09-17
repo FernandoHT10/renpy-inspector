@@ -33,3 +33,17 @@ def test_build_script_exists():
 
     # Verify build_windows.py parses
     ast.parse(py_script.read_text(encoding="utf-8"))
+
+
+def test_spec_includes_all_default_rule_modules():
+    from renpy_inspector.core.rules import get_default_rules
+
+    root_dir = Path(__file__).resolve().parent.parent
+    spec_path = root_dir / "renpy_inspector.spec"
+    code = spec_path.read_text(encoding="utf-8")
+
+    for rule in get_default_rules():
+        module_name = rule.__class__.__module__
+        assert module_name in code, (
+            f"Rule module {module_name} for rule {rule.rule_id} is missing from spec"
+        )

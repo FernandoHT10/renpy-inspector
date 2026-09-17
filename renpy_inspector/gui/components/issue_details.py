@@ -147,7 +147,7 @@ class IssueDetailsPane(QWidget):
         self.lbl_title.setText(issue.title)
 
         loc_text = str(issue.location) if issue.location else "Global"
-        cat_text = issue.category.value.capitalize()
+        cat_text = issue.category.value
         self.lbl_meta.setText(f"File: {loc_text}  •  Category: {cat_text}")
 
         self.lbl_desc_title.setVisible(True)

@@ -81,7 +81,7 @@ class ScanWorker(QThread):
             )
 
             # Step 4: Rule Engine Analysis
-            self.progress_changed.emit(85, "Executing QA static analysis rules...")
+            self.progress_changed.emit(80, "Executing QA static analysis rules...")
             if self._is_cancelled:
                 return
 
@@ -91,8 +91,16 @@ class ScanWorker(QThread):
                 parsed_project=parsed_proj,
             )
 
+            def on_rule_progress(rule_title: str, current: int, total: int) -> None:
+                if self._is_cancelled:
+                    return
+                pct = 80 + int((current / max(1, total)) * 18)
+                self.progress_changed.emit(
+                    pct, f"Evaluating rule {current}/{total}: {rule_title}..."
+                )
+
             runner = RuleRunner()
-            issues: List[Issue] = runner.run(context)
+            issues: List[Issue] = runner.run(context, progress_callback=on_rule_progress)
 
             if self._is_cancelled:
                 return

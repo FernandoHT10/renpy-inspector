@@ -103,7 +103,7 @@ class IssuesTable(QTableWidget):
             loc_item.setForeground(QColor("#8b949e"))
 
             # Category
-            cat_item = QTableWidgetItem(issue.category.value.capitalize())
+            cat_item = QTableWidgetItem(issue.category.value)
             cat_item.setForeground(QColor("#8b949e"))
 
             self.setItem(row_idx, 0, sev_item)
