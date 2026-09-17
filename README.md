@@ -41,7 +41,7 @@ For a detailed step-by-step walkthrough, see the [User Guide (USER_GUIDE.md)](US
 * **Interactive Issues Table**: Sortable table with color-coded severity badges, rule identifiers, titles, disk locations (`game/...:LXX`), and categories.
 * **Detailed Diagnostics Pane**:
   * Monospaced code snippet viewer showing original source code with contextual line numbers.
-  * Prominent **Recommended Action** (`💡 RECOMMENDED ACTION`) box providing direct copy-pasteable fix instructions.
+  * Prominent **Recommended Action** (`RECOMMENDED ACTION`) box providing direct copy-pasteable fix instructions.
   * Exact file location and rule metadata.
 * **Non-Blocking Async Worker (`QThread`)**: Smooth progress bar showing live evaluation of each of the 20 rules step-by-step with instant cancellation support.
 * **Direct 1-Click Exporters**: Native buttons to export standalone interactive HTML reports and structured JSON data.
