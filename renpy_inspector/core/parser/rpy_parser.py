@@ -238,8 +238,22 @@ class RpyParser:
                             )
                     pending_dead_stmt = None
 
-                # Extract dialogue lines / text tags
-                if active_python_block is None and "{" in code and "}" in code:
+                # Extract dialogue lines / text tags (ignore declarations and python statements)
+                is_non_dialogue = (
+                    code.startswith((
+                        "define ", "default ", "image ", "transform ", "style ", "$",
+                        "init ", "init:", "layeredimage ", "camera "
+                    ))
+                    or "what_prefix" in code
+                    or "who_prefix" in code
+                )
+                can_extract_diag = (
+                    active_python_block is None
+                    and not is_non_dialogue
+                    and "{" in code
+                    and "}" in code
+                )
+                if can_extract_diag:
                     for m1, m2 in RE_QUOTED_STRING.findall(code):
                         text = m1 or m2
                         if "{" in text and "}" in text:
