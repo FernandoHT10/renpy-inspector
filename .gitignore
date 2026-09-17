@@ -1,0 +1,36 @@
+﻿# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Linter
+.ruff_cache/
+
+# Distribution / Build
+build/
+dist/
+*.egg-info/
+*.spec.bak
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Reports and temporary exports
+reports/
+*.report.json
+*.report.html
