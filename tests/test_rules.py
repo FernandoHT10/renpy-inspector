@@ -22,7 +22,12 @@ from renpy_inspector.core.rules.code.broken_jump import BrokenJumpRule
 from renpy_inspector.core.rules.code.conflicting_define_default import (
     ConflictingDefineDefaultRule,
 )
+from renpy_inspector.core.rules.code.define_persistent import DefinePersistentRule
 from renpy_inspector.core.rules.code.duplicate_label import DuplicateLabelRule
+from renpy_inspector.core.rules.code.duplicate_screen import DuplicateScreenRule
+from renpy_inspector.core.rules.code.empty_menu import EmptyMenuRule
+from renpy_inspector.core.rules.code.unclosed_text_tags import UnclosedTextTagsRule
+from renpy_inspector.core.rules.code.unreachable_code import UnreachableCodeRule
 from renpy_inspector.core.rules.translation.missing_translation import (
     MissingTranslationRule,
 )
@@ -334,7 +339,7 @@ label start:
     ctx = create_test_context(tmp_path, scripts)
 
     registry = RuleRegistry.create_default()
-    assert len(registry.get_all_rules()) == 14
+    assert len(registry.get_all_rules()) == 19
 
     # Test disabling BrokenJumpRule
     registry.set_enabled("RPY-CODE-001", False)
@@ -416,4 +421,120 @@ def test_missing_audio_rule_with_playback_clauses(tmp_path: Path):
     rule = MissingAudioRule()
     issues = rule.analyze(ctx)
     assert len(issues) == 0
+
+
+def test_unreachable_code_rule(tmp_path: Path):
+    scripts = {
+        "story.rpy": """
+label start:
+    jump epilogue
+    "This dialogue is unreachable!"
+    $ dead_var = 1
+
+label epilogue:
+    return
+    $ also_dead = 2
+
+label normal_flow:
+    jump start
+label next_label:
+    "This label is reachable!"
+    return
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = UnreachableCodeRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 2
+    assert all(i.rule_id == "RPY-CODE-007" for i in issues)
+    assert issues[0].metadata["preceding_statement"] == "jump epilogue"
+    assert issues[1].metadata["preceding_statement"] == "return"
+
+
+def test_define_persistent_rule(tmp_path: Path):
+    scripts = {
+        "options.rpy": """
+define persistent.unlocked_art = True
+define store.persistent.high_score = 9999
+default persistent.player_choice = "A"
+define config.name = "My Visual Novel"
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = DefinePersistentRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 2
+    assert all(i.rule_id == "RPY-CODE-008" for i in issues)
+    vars_flagged = {i.metadata["variable"] for i in issues}
+    assert vars_flagged == {"persistent.unlocked_art", "store.persistent.high_score"}
+
+
+def test_empty_menu_rule(tmp_path: Path):
+    scripts = {
+        "menus.rpy": """
+label choices:
+    menu:
+        "Option 1":
+            jump opt1
+        "Option 2":
+            jump opt2
+
+    menu:
+        pass
+
+    menu empty_named:
+        $ some_code = 1
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = EmptyMenuRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 2
+    assert all(i.rule_id == "RPY-CODE-009" for i in issues)
+
+
+def test_duplicate_screen_rule(tmp_path: Path):
+    scripts = {
+        "screens.rpy": """
+screen main_menu():
+    text "Main Menu V1"
+
+screen main_menu():
+    text "Main Menu V2 Duplicate"
+
+screen quick_menu():
+    text "Desktop Quick Menu"
+
+screen quick_menu():
+    variant "touch"
+    text "Touch Quick Menu Variant"
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = DuplicateScreenRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 1
+    assert issues[0].rule_id == "RPY-SCREEN-002"
+    assert issues[0].metadata["screen_name"] == "main_menu"
+
+
+def test_unclosed_text_tags_rule(tmp_path: Path):
+    scripts = {
+        "dialogue.rpy": """
+label start:
+    "Hello {b}world!"
+    "Welcome {color=#ff0000}{i}Hero{/i}{/color}"
+    "Broken {size=30}large text without closing"
+    "Wait for me...{w=1.0}{p} Ready!"
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = UnclosedTextTagsRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 2
+    assert all(i.rule_id == "RPY-TEXT-001" for i in issues)
+    tags_found = [i.metadata["unclosed_tags"] for i in issues]
+    assert ["b"] in tags_found
+    assert ["size"] in tags_found
+
 

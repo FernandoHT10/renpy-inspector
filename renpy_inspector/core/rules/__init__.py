@@ -13,9 +13,14 @@ from renpy_inspector.core.rules.code import (
     BrokenCallRule,
     BrokenJumpRule,
     ConflictingDefineDefaultRule,
+    DefinePersistentRule,
     DuplicateLabelRule,
+    DuplicateScreenRule,
+    EmptyMenuRule,
     ShadowBuiltinRule,
+    UnclosedTextTagsRule,
     UndefinedScreenRule,
+    UnreachableCodeRule,
     UnusedLabelRule,
 )
 from renpy_inspector.core.rules.translation import MissingTranslationRule
@@ -38,6 +43,11 @@ def get_default_rules() -> list[BaseRule]:
         UndefinedScreenRule(),
         InvalidAudioChannelRule(),
         ShadowBuiltinRule(),
+        UnreachableCodeRule(),
+        DefinePersistentRule(),
+        EmptyMenuRule(),
+        DuplicateScreenRule(),
+        UnclosedTextTagsRule(),
     ]
 
 
@@ -57,5 +67,10 @@ __all__ = [
     "UndefinedScreenRule",
     "InvalidAudioChannelRule",
     "ShadowBuiltinRule",
+    "UnreachableCodeRule",
+    "DefinePersistentRule",
+    "EmptyMenuRule",
+    "DuplicateScreenRule",
+    "UnclosedTextTagsRule",
     "get_default_rules",
 ]

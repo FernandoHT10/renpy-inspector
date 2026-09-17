@@ -252,11 +252,64 @@ class ScreenDefinition:
     name: str
     location: Location
     params: Optional[str] = None
+    variant: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "location": self.location.to_dict(),
             "params": self.params,
+            "variant": self.variant,
         }
+
+
+@dataclass(frozen=True)
+class MenuBlock:
+    """Represents a Ren'Py menu: block statement."""
+
+    location: Location
+    item_count: int = 0
+    scope_label: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "location": self.location.to_dict(),
+            "item_count": self.item_count,
+            "scope_label": self.scope_label,
+        }
+
+
+@dataclass(frozen=True)
+class DialogueLine:
+    """Represents a dialogue text line or say statement."""
+
+    text: str
+    location: Location
+    speaker: Optional[str] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "text": self.text,
+            "location": self.location.to_dict(),
+            "speaker": self.speaker,
+        }
+
+
+@dataclass(frozen=True)
+class UnreachableStatement:
+    """Represents a statement directly following an unconditional jump or return."""
+
+    statement: str
+    location: Location
+    preceding_statement: str
+    preceding_line: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "statement": self.statement,
+            "location": self.location.to_dict(),
+            "preceding_statement": self.preceding_statement,
+            "preceding_line": self.preceding_line,
+        }
+
 

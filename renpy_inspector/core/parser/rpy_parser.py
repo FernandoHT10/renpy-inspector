@@ -1,6 +1,7 @@
 """Deterministic static parser for Ren'Py scripts (.rpy and .rpym)."""
 
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Optional, Union
 
@@ -9,13 +10,16 @@ from renpy_inspector.core.models.location import Location
 from renpy_inspector.core.models.symbols import (
     AudioReference,
     CallReference,
+    DialogueLine,
     ImageDefinition,
     JumpReference,
     LabelSymbol,
+    MenuBlock,
     PythonBlock,
     ReferenceKind,
     ScreenDefinition,
     TranslateBlock,
+    UnreachableStatement,
     VariableDeclaration,
 )
 from renpy_inspector.core.parser.errors import ParseError
@@ -26,7 +30,11 @@ from renpy_inspector.core.parser.source import SourceFile, SourceLoader
 # Regex patterns for Ren'Py statements (using Unicode-aware word matching)
 RE_LABEL = re.compile(r"^label\s+([\w\.]+)(?:\s*\((.*)\))?\s*:$", re.UNICODE)
 RE_MENU = re.compile(r"^menu\s+([\w\.]+)(?:\s*\((.*)\))?\s*:$", re.UNICODE)
+RE_MENU_ITEM = re.compile(r'^(?:"([^"]+)"|\'([^\']+)\')(?:\s+if\s+.*)?\s*:$', re.UNICODE)
 RE_SCREEN = re.compile(r"^screen\s+([\w\.]+)(?:\s*\((.*)\))?.*:$", re.UNICODE)
+RE_VARIANT_STMT = re.compile(r'^variant\s+["\'](\w+)["\']', re.UNICODE)
+RE_VARIANT_HEADER = re.compile(r'variant\s*=\s*["\'](\w+)["\']', re.UNICODE)
+RE_QUOTED_STRING = re.compile(r'"([^"]*)"|\'([^\']*)\'', re.UNICODE)
 RE_JUMP = re.compile(r"^jump\s+(.+)$", re.UNICODE)
 RE_CALL = re.compile(r"^call\s+(.+)$", re.UNICODE)
 RE_IMAGE_EQUAL = re.compile(r"^image\s+([^=]+)=\s*(.+)$", re.UNICODE)
@@ -112,6 +120,15 @@ class RpyParser:
         """Iterate through logical lines extracting Ren'Py symbols and tracking state."""
         current_global_label: Optional[str] = None
         active_screen_indent: Optional[int] = None
+        active_screen_index: int = -1
+
+        active_menu_indent: Optional[int] = None
+        active_menu_location: Optional[Location] = None
+        active_menu_item_count: int = 0
+
+        pending_dead_stmt: Optional[str] = None
+        pending_dead_indent: int = 0
+        pending_dead_line: int = 0
 
         # Tracking state for multi-line Python blocks
         active_python_block: Optional[PythonBlock] = None
@@ -144,6 +161,32 @@ class RpyParser:
                 if active_screen_indent is not None and not line.is_empty:
                     if line.indent <= active_screen_indent:
                         active_screen_indent = None
+                        active_screen_index = -1
+                    else:
+                        m_var = RE_VARIANT_STMT.match(line.stripped_code)
+                        if m_var and 0 <= active_screen_index < len(result.screens):
+                            sc = result.screens[active_screen_index]
+                            result.screens[active_screen_index] = replace(
+                                sc, variant=m_var.group(1).strip()
+                            )
+
+                # Check if indentation returned to outer scope; finalize menu block
+                if active_menu_indent is not None and not line.is_empty:
+                    if line.indent > active_menu_indent:
+                        if RE_MENU_ITEM.match(line.stripped_code):
+                            active_menu_item_count += 1
+                    else:
+                        if active_menu_location is not None:
+                            result.menus.append(
+                                MenuBlock(
+                                    location=active_menu_location,
+                                    item_count=active_menu_item_count,
+                                    scope_label=current_global_label,
+                                )
+                            )
+                        active_menu_indent = None
+                        active_menu_location = None
+                        active_menu_item_count = 0
 
                 # 2. Skip empty lines or multiline string continuations
                 if line.is_empty or line.is_multiline_string_continuation:
@@ -151,11 +194,70 @@ class RpyParser:
 
                 code = line.stripped_code
 
+                # Check unreachable dead code immediately following jump or return
+                if pending_dead_stmt is not None:
+                    if line.indent >= pending_dead_indent:
+                        if not code.startswith((
+                            "label ", "menu", "init ", "screen ", "define ", "default ",
+                            "transform "
+                        )):
+                            result.unreachables.append(
+                                UnreachableStatement(
+                                    statement=code,
+                                    location=Location(
+                                        file_path=line.file_path,
+                                        line_number=line.line_number,
+                                        column_number=line.column,
+                                        source_snippet=line.raw_text.strip(),
+                                    ),
+                                    preceding_statement=pending_dead_stmt,
+                                    preceding_line=pending_dead_line,
+                                )
+                            )
+                    pending_dead_stmt = None
+
+                # Extract dialogue lines / text tags
+                if active_python_block is None and "{" in code and "}" in code:
+                    for m1, m2 in RE_QUOTED_STRING.findall(code):
+                        text = m1 or m2
+                        if "{" in text and "}" in text:
+                            result.dialogues.append(
+                                DialogueLine(
+                                    text=text,
+                                    location=Location(
+                                        file_path=line.file_path,
+                                        line_number=line.line_number,
+                                        column_number=line.column,
+                                        source_snippet=line.raw_text.strip(),
+                                    ),
+                                )
+                            )
+
+                # Track menu blocks
+                is_menu_stmt = code == "menu:" or code.startswith(("menu ", "menu:"))
+                if is_menu_stmt and active_screen_indent is None:
+                    if active_menu_indent is not None and active_menu_location is not None:
+                        result.menus.append(
+                            MenuBlock(
+                                location=active_menu_location,
+                                item_count=active_menu_item_count,
+                                scope_label=current_global_label,
+                            )
+                        )
+                    active_menu_indent = line.indent
+                    active_menu_location = Location(
+                        file_path=line.file_path,
+                        line_number=line.line_number,
+                        column_number=line.column,
+                        source_snippet=line.raw_text.strip(),
+                    )
+                    active_menu_item_count = 0
+
                 # Fast keyword check: skip regex matching on dialogue / non-statements
                 if not code.startswith((
                     "label", "screen", "jump", "call", "image", "play", "queue",
                     "define", "default", "translate", "scene", "show", "hide",
-                    "init", "python", "$", "menu", "voice", "layeredimage"
+                    "init", "python", "$", "menu", "voice", "layeredimage", "return"
                 )) and "register_channel" not in code:
                     continue
 
@@ -224,6 +326,10 @@ class RpyParser:
                         screen_name = m_screen.group(1).strip()
                         params = m_screen.group(2)
                         active_screen_indent = line.indent
+                        var_header = None
+                        m_vh = RE_VARIANT_HEADER.search(code)
+                        if m_vh:
+                            var_header = m_vh.group(1).strip()
                         result.screens.append(
                             ScreenDefinition(
                                 name=screen_name,
@@ -234,8 +340,10 @@ class RpyParser:
                                     source_snippet=line.raw_text.strip(),
                                 ),
                                 params=params.strip() if params else None,
+                                variant=var_header,
                             )
                         )
+                        active_screen_index = len(result.screens) - 1
                         continue
 
                 # 5. Jumps
@@ -274,6 +382,15 @@ class RpyParser:
                                     scope_label=current_global_label,
                                 )
                             )
+                            can_track_dead = (
+                                active_python_block is None
+                                and active_screen_indent is None
+                                and not code.endswith(":")
+                            )
+                            if can_track_dead:
+                                pending_dead_stmt = code
+                                pending_dead_indent = line.indent
+                                pending_dead_line = line.line_number
                         continue
 
                 # 6. Calls
@@ -609,6 +726,15 @@ class RpyParser:
                             result.scenes_and_shows.append(raw_tag)
                         continue
 
+                # 13. Return statements
+                is_ret = code == "return" or code.startswith("return ")
+                if is_ret and active_python_block is None and active_screen_indent is None:
+                    if not code.endswith(("(", "[", "{", ",", "\\")):
+                        pending_dead_stmt = code
+                        pending_dead_indent = line.indent
+                        pending_dead_line = line.line_number
+                        continue
+
             except Exception as exc:  # Recover safely from any per-line parsing exception
                 result.errors.append(
                     ParseError(
@@ -620,6 +746,16 @@ class RpyParser:
                         source_snippet=line.raw_text.strip(),
                     )
                 )
+
+        # Finalize any pending menu block at end of file
+        if active_menu_indent is not None and active_menu_location is not None:
+            result.menus.append(
+                MenuBlock(
+                    location=active_menu_location,
+                    item_count=active_menu_item_count,
+                    scope_label=current_global_label,
+                )
+            )
 
         # Finalize any pending Python block at end of file
         if active_python_block is not None:

@@ -12,12 +12,15 @@ from renpy_inspector.core.models.project import RenPyProject
 from renpy_inspector.core.models.symbols import (
     AudioReference,
     CallReference,
+    DialogueLine,
     ImageDefinition,
     JumpReference,
     LabelSymbol,
+    MenuBlock,
     PythonBlock,
     ScreenDefinition,
     TranslateBlock,
+    UnreachableStatement,
     VariableDeclaration,
 )
 from renpy_inspector.core.parser.result import ParsedProject
@@ -99,6 +102,15 @@ class ProjectContext:
     all_python_blocks: list[PythonBlock] = field(default_factory=list)
     all_screens: list[ScreenDefinition] = field(default_factory=list)
     defined_screens: set[str] = field(default_factory=set)
+    screens_by_name: dict[str, list[ScreenDefinition]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    screens_by_name_and_variant: dict[tuple[str, Optional[str]], list[ScreenDefinition]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    all_menus: list[MenuBlock] = field(default_factory=list)
+    all_dialogues: list[DialogueLine] = field(default_factory=list)
+    all_unreachables: list[UnreachableStatement] = field(default_factory=list)
 
     defines_by_name: dict[str, list[VariableDeclaration]] = field(
         default_factory=lambda: defaultdict(list)
@@ -186,6 +198,8 @@ class ProjectContext:
             for sc in file_result.screens:
                 self.all_screens.append(sc)
                 self.defined_screens.add(sc.name)
+                self.screens_by_name[sc.name].append(sc)
+                self.screens_by_name_and_variant[(sc.name, sc.variant)].append(sc)
                 add_token(sc.name)
 
             # Collect references
@@ -196,6 +210,9 @@ class ProjectContext:
             self.all_variables.extend(file_result.variables)
             self.all_translations.extend(file_result.translations)
             self.all_python_blocks.extend(file_result.python_blocks)
+            self.all_menus.extend(file_result.menus)
+            self.all_dialogues.extend(file_result.dialogues)
+            self.all_unreachables.extend(file_result.unreachables)
 
             # Index define and default
             for var in file_result.variables:

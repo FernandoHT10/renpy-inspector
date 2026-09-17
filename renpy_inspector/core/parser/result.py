@@ -6,13 +6,16 @@ from typing import Any
 from renpy_inspector.core.models.symbols import (
     AudioReference,
     CallReference,
+    DialogueLine,
     ImageDefinition,
     JumpReference,
     LabelSymbol,
+    MenuBlock,
     PythonBlock,
     ReferenceKind,
     ScreenDefinition,
     TranslateBlock,
+    UnreachableStatement,
     VariableDeclaration,
 )
 from renpy_inspector.core.parser.errors import ParseError
@@ -32,9 +35,13 @@ class FileParseResult:
     translations: list[TranslateBlock] = field(default_factory=list)
     python_blocks: list[PythonBlock] = field(default_factory=list)
     screens: list[ScreenDefinition] = field(default_factory=list)
+    menus: list[MenuBlock] = field(default_factory=list)
+    dialogues: list[DialogueLine] = field(default_factory=list)
+    unreachables: list[UnreachableStatement] = field(default_factory=list)
     scenes_and_shows: list[str] = field(default_factory=list)
     registered_channels: list[str] = field(default_factory=list)
     errors: list[ParseError] = field(default_factory=list)
+
 
     @property
     def has_errors(self) -> bool:
@@ -67,6 +74,10 @@ class FileParseResult:
             "variables": [s.to_dict() for s in self.variables],
             "translations": [s.to_dict() for s in self.translations],
             "python_blocks": [s.to_dict() for s in self.python_blocks],
+            "screens": [s.to_dict() for s in self.screens],
+            "menus": [s.to_dict() for s in self.menus],
+            "dialogues": [s.to_dict() for s in self.dialogues],
+            "unreachables": [s.to_dict() for s in self.unreachables],
             "errors": [s.to_dict() for s in self.errors],
         }
 
