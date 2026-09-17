@@ -795,3 +795,74 @@ translate es start_12345678:
     issues = rule.analyze(ctx)
     assert not any(i.metadata.get("language") == "YourLanguage" for i in issues)
 
+
+def test_prefix_formatting_tags_auto_close(tmp_path: Path):
+    scripts = {
+        "script.rpy": """
+label start:
+    "{b}This is bold."
+    "{size=50}Large heading"
+    "{i}*sigh*"
+    "{color=#ff0000}{size=30}Combined prefix tags"
+    "\\\\n{color=#ffffff}Escaped newline with prefix tag"
+    "Hello {b}world!"
+    "Normal text {size=30}unclosed size tag"
+    "{b}bold{b}"
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = UnclosedTextTagsRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 3
+    tags_found = [i.metadata["unclosed_tags"] for i in issues]
+    assert ["b"] in tags_found
+    assert ["size"] in tags_found
+
+
+def test_screen_and_tl_old_new_not_treated_as_dialogue(tmp_path: Path):
+    scripts = {
+        "screens.rpy": """
+screen navigation():
+    text _("{size=30}Main Menu")
+    textbutton _("{size=-2}Preferences") action ShowMenu("preferences")
+""",
+        "tl/es/screens.rpy": """
+translate es strings:
+    old "{size=30}Main Menu"
+    new "{size=30}Menú Principal"
+""",
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = UnclosedTextTagsRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 0
+
+
+def test_asset_token_pool_includes_screen_and_python_literals(tmp_path: Path):
+    scripts = {
+        "screens.rpy": """
+screen my_ui():
+    add "gui/circle_qte.png"
+    imagebutton idle "itch-io.png" hover "itch-io-hover.png"
+""",
+        "logic.rpy": """
+init python:
+    gallery_items = ["cg/u6f1007a.webp", "special_reward.png"]
+""",
+    }
+    assets = [
+        "images/gui/circle_qte.png",
+        "images/itch-io.png",
+        "images/itch-io-hover.png",
+        "images/cg/u6f1007a.webp",
+        "images/special_reward.png",
+        "images/truly_unused_cutscene.png",
+    ]
+    ctx = create_test_context(tmp_path, scripts, dummy_assets=assets)
+    rule = UnusedAssetCandidateRule()
+    issues = rule.analyze(ctx)
+    # Only truly_unused_cutscene.png should be flagged
+    assert len(issues) == 1
+    assert "truly_unused_cutscene.png" in issues[0].message
+
+

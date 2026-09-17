@@ -79,6 +79,9 @@ BUILTIN_RENPY_SCREENS = frozenset(
 )
 
 
+RE_IMAGE_TAG = re.compile(r"\{image=([^}]+)\}")
+
+
 @dataclass
 class ProjectContext:
     """Precomputed symbol and asset index for high-performance, deterministic rule execution."""
@@ -165,19 +168,24 @@ class ProjectContext:
             posix = clean.replace("\\", "/")
             self.script_token_pool.add(posix)
             self.script_token_pool.add(posix.lower())
-            if "/" in posix or "\\" in clean:
-                fname = Path(posix).name
+
+            p = Path(posix)
+            fname = p.name
+            if fname:
                 self.script_token_pool.add(fname)
                 self.script_token_pool.add(fname.lower())
-                stem = Path(posix).stem
+            stem = p.stem
+            if stem:
                 self.script_token_pool.add(stem)
                 self.script_token_pool.add(stem.lower())
                 self.script_token_pool.add(stem.replace("_", " "))
                 self.script_token_pool.add(stem.replace("_", " ").lower())
-            elif "_" in clean:
+                self.script_token_pool.add(stem.replace(" ", "_"))
+                self.script_token_pool.add(stem.replace(" ", "_").lower())
+            if "_" in clean:
                 self.script_token_pool.add(clean.replace("_", " "))
                 self.script_token_pool.add(clean.replace("_", " ").lower())
-            elif " " in clean:
+            if " " in clean:
                 self.script_token_pool.add(clean.replace(" ", "_"))
                 self.script_token_pool.add(clean.replace(" ", "_").lower())
 
@@ -254,6 +262,11 @@ class ProjectContext:
                 # If tag is composite (e.g. "chel happy"), also index parts
                 for part in tag.split():
                     add_token(part)
+            for lit in file_result.string_literals:
+                add_token(lit)
+                if "{image=" in lit:
+                    for m_img in RE_IMAGE_TAG.finditer(lit):
+                        add_token(m_img.group(1))
 
         # Index audio and video assets by filename and stem for recursive audio lookup
         for a in self.catalog.get_by_type(AssetType.AUDIO):

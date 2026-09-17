@@ -44,6 +44,7 @@ class FileParseResult:
     init_statements: list[InitStatement] = field(default_factory=list)
     custom_text_tags: list[str] = field(default_factory=list)
     custom_self_closing_text_tags: list[str] = field(default_factory=list)
+    string_literals: list[str] = field(default_factory=list)
     errors: list[ParseError] = field(default_factory=list)
 
 

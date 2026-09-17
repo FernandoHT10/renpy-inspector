@@ -52,24 +52,50 @@ class UnclosedTextTagsRule(BaseRule):
             if "{" not in text or "}" not in text:
                 continue
 
-            stack: list[str] = []
+            stack: list[tuple[str, bool]] = []
+            last_end = 0
+            has_seen_text = False
+
             for tag_match in RE_TEXT_TAG.finditer(text):
+                between = text[last_end : tag_match.start()]
+                cleaned_between = (
+                    between.replace("\\n", "")
+                    .replace("\\t", "")
+                    .replace("\\r", "")
+                    .replace("\n", "")
+                    .replace("\r", "")
+                    .replace("\t", "")
+                    .strip(" \t\r\n\\")
+                )
+                if cleaned_between:
+                    has_seen_text = True
+                last_end = tag_match.end()
+
                 raw_tag = tag_match.group(1).lower()
                 if raw_tag.startswith("/"):
                     closing = raw_tag[1:]
                     if closing in effective_paired:
-                        if stack and stack[-1] == closing:
-                            stack.pop()
-                        elif closing in stack:
-                            stack.remove(closing)
+                        idx = -1
+                        for i in range(len(stack) - 1, -1, -1):
+                            if stack[i][0] == closing:
+                                idx = i
+                                break
+                        if idx != -1:
+                            stack.pop(idx)
                 else:
                     if raw_tag in effective_paired:
-                        stack.append(raw_tag)
+                        stack.append((raw_tag, not has_seen_text))
 
-            if stack:
-                tags_str = ", ".join(f"'{t}'" for t in stack)
+            # Tags opened before any visible dialogue text (is_prefix == True)
+            # apply to the entire line and are automatically closed by Ren'Py
+            # when the displayable ends. Only tags opened inline mid-sentence
+            # (is_prefix == False) that remain unclosed are reported as issues.
+            unclosed = [t for t, is_prefix in stack if not is_prefix]
+
+            if unclosed:
+                tags_str = ", ".join(f"'{t}'" for t in unclosed)
                 preview = text if len(text) <= 50 else text[:47] + "..."
-                closings_sug = "".join(f"{{/{t}}}" for t in reversed(stack))
+                closings_sug = "".join(f"{{/{t}}}" for t in reversed(unclosed))
 
                 msg = (
                     f"Dialogue text contains unclosed formatting tag(s): {tags_str} "
@@ -83,7 +109,7 @@ class UnclosedTextTagsRule(BaseRule):
                         location=diag.location,
                         suggestion=sug,
                         metadata={
-                            "unclosed_tags": stack,
+                            "unclosed_tags": unclosed,
                             "dialogue_text": text,
                         },
                     )

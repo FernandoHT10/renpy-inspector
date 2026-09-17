@@ -178,6 +178,13 @@ class RpyParser:
                 if line_idx < skip_until_idx:
                     continue
 
+                code = line.stripped_code
+                if code and ('"' in code or "'" in code):
+                    for m1, m2 in RE_QUOTED_STRING.findall(code):
+                        s = m1 or m2
+                        if s:
+                            result.string_literals.append(s)
+
                 # 1. Check if we are inside a Python block
                 if active_python_block is not None:
                     if line.is_empty or line.indent > python_block_indent:
@@ -296,12 +303,13 @@ class RpyParser:
                             )
                     pending_dead_stmt = None
 
-                # Extract dialogue lines / text tags (ignore declarations and python statements)
+                # Extract dialogue lines / text tags (ignore declarations/screens/tl)
                 is_non_dialogue = (
                     code.startswith((
                         "define ", "default ", "image ", "transform ", "style ", "$",
-                        "init ", "init:", "layeredimage ", "camera "
+                        "init ", "init:", "layeredimage ", "camera ", "old ", "new "
                     ))
+                    or active_screen_indent is not None
                     or "what_prefix" in code
                     or "who_prefix" in code
                 )
