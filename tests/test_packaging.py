@@ -6,9 +6,11 @@ from pathlib import Path
 
 def test_spec_file_syntax_and_structure():
     root_dir = Path(__file__).resolve().parent.parent
-    spec_path = root_dir / "renpy_inspector.spec"
+    spec_path = root_dir / "scripts" / "renpy_inspector.spec"
+    if not spec_path.is_file():
+        spec_path = root_dir / "renpy_inspector.spec"
 
-    assert spec_path.is_file(), "renpy_inspector.spec should exist"
+    assert spec_path.is_file(), "renpy_inspector.spec should exist in scripts/ or root"
     code = spec_path.read_text(encoding="utf-8")
 
     # Verify syntax validity via AST parse
@@ -17,7 +19,8 @@ def test_spec_file_syntax_and_structure():
 
     # Check key configuration contents
     assert "PySide6" in code
-    assert "renpy_inspector/gui/app.py" in code
+    assert "app.py" in code
+    assert "renpy_inspector" in code
     assert "RenPyInspector" in code
     assert "hiddenimports" in code
     assert "RPY-CODE-001" not in code  # spec contains module names, not rule IDs
@@ -39,7 +42,9 @@ def test_spec_includes_all_default_rule_modules():
     from renpy_inspector.core.rules import get_default_rules
 
     root_dir = Path(__file__).resolve().parent.parent
-    spec_path = root_dir / "renpy_inspector.spec"
+    spec_path = root_dir / "scripts" / "renpy_inspector.spec"
+    if not spec_path.is_file():
+        spec_path = root_dir / "renpy_inspector.spec"
     code = spec_path.read_text(encoding="utf-8")
 
     for rule in get_default_rules():

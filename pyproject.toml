@@ -31,7 +31,7 @@ dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/FernandoHT10/renpy-inspector"
-Documentation = "https://github.com/FernandoHT10/renpy-inspector/blob/main/USER_GUIDE.md"
+Documentation = "https://github.com/FernandoHT10/renpy-inspector/blob/main/docs/USER_GUIDE.md"
 Issues = "https://github.com/FernandoHT10/renpy-inspector/issues"
 
 [project.optional-dependencies]

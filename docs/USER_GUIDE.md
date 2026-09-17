@@ -1,6 +1,6 @@
 # Ren'Py Inspector — User Guide & Manual
 
-> 🌐 **Language / Idioma**: [English](USER_GUIDE.md) • [Español](USER_GUIDE.es.md)
+> 🌐 **Language / Idioma**: [English](USER_GUIDE.md) • [Español](USER_GUIDE.es.md) • [Home / README](../README.md)
 
 Welcome to the official **Ren'Py Inspector** User Guide.
 

@@ -7,6 +7,10 @@ from pathlib import Path
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 import pytest  # noqa: E402
+
+# Skip gracefully if PySide6 is not installed
+pytest.importorskip("PySide6")
+
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from renpy_inspector.core.models.enums import Category, Severity  # noqa: E402

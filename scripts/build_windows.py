@@ -9,7 +9,9 @@ from pathlib import Path
 def build_executable() -> int:
     """Invokes PyInstaller using the renpy_inspector.spec file."""
     root_dir = Path(__file__).resolve().parent.parent
-    spec_file = root_dir / "renpy_inspector.spec"
+    spec_file = root_dir / "scripts" / "renpy_inspector.spec"
+    if not spec_file.is_file():
+        spec_file = root_dir / "renpy_inspector.spec"
     dist_dir = root_dir / "dist"
     build_dir = root_dir / "build"
 

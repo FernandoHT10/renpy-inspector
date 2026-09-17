@@ -1,21 +1,21 @@
 # Ren'Py Inspector
 
-> 🌐 **Language**: [English](README.md) • [Español](README.es.md)
+> 🌐 **Language**: [English](README.md) • [Español](docs/README.es.md)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![GUI: PySide6](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-success.svg)](https://wiki.qt.io/Qt_for_Python)
 [![Static Analysis](https://img.shields.io/badge/analysis-100%25%20Static%20%26%20Safe-brightgreen.svg)]()
 [![Rules: 20 Core](https://img.shields.io/badge/rules-20%20Core%20Rules-blueviolet.svg)]()
-[![Tests: 113 Passed](https://img.shields.io/badge/tests-113%20passing%20(100%25)-brightgreen.svg)]()
+[![Tests: 111 Passed](https://img.shields.io/badge/tests-111%20passing%20(100%25)-brightgreen.svg)]()
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Platform: Windows | Linux | macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![License: Commercial](https://img.shields.io/badge/license-Commercial-informational.svg)]()
+[![License: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](LICENSE)
 
 **Ren'Py Inspector** is an enterprise-grade desktop GUI and CLI static analysis, quality assurance (QA), and continuous auditing platform engineered specifically for visual novel developers and studios building on the [Ren'Py](https://www.renpy.org/) engine.
 
 It thoroughly validates Ren'Py projects of any scale to detect broken narrative jumps, missing or orphaned assets, cross-platform casing mismatches (Linux/Steam Deck/macOS vs. Windows), conflicting define/default declarations, fatal persistence bugs, empty menu choices, unreachable dead code, duplicate screens, and unclosed text dialogue formatting tags **before compiling or publishing the game**.
 
-For a detailed step-by-step walkthrough, see the [User Guide (USER_GUIDE.md)](USER_GUIDE.md).
+For a detailed step-by-step walkthrough, see the [User Guide (docs/USER_GUIDE.md)](docs/USER_GUIDE.md).
 
 ---
 
@@ -56,7 +56,7 @@ For a detailed step-by-step walkthrough, see the [User Guide (USER_GUIDE.md)](US
 * **Structured JSON Report**: Versioned v1.0.0 schema ready for ingestion into custom QA dashboards, SonarQube, or analytics pipelines.
 
 ### Windows Standalone Executable (.exe)
-* Optimized PyInstaller specification (`renpy_inspector.spec`) and build scripts to generate a single-file portable `.exe` that runs without requiring Python on target machines.
+* Optimized PyInstaller specification (`scripts/renpy_inspector.spec`) and build scripts to generate a single-file portable `.exe` that runs without requiring Python on target machines.
 
 ---
 
@@ -197,7 +197,7 @@ renpy-inspector "C:/Games/MyRenpyGame" --export-html qa_report.html --export-jso
 
 ## 8. Windows Standalone Executable (.exe)
 
-Ren'Py Inspector includes a PyInstaller specification (`renpy_inspector.spec`) to build a 100% standalone, portable `.exe` that runs without Python installed:
+Ren'Py Inspector includes a PyInstaller specification (`scripts/renpy_inspector.spec`) to build a 100% standalone, portable `.exe` that runs without Python installed:
 
 ```powershell
 # Option 1: Build with automated PowerShell script

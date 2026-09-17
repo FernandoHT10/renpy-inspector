@@ -1,15 +1,15 @@
 # Ren'Py Inspector
 
-> 🌐 **Idioma / Language**: [Español](README.es.md) • [English](README.md)
+> 🌐 **Idioma / Language**: [Español](README.es.md) • [English](../README.md)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![GUI: PySide6](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-success.svg)](https://wiki.qt.io/Qt_for_Python)
 [![Static Analysis](https://img.shields.io/badge/analysis-100%25%20Static%20%26%20Safe-brightgreen.svg)]()
 [![Rules: 20 Core](https://img.shields.io/badge/rules-20%20Core%20Rules-blueviolet.svg)]()
-[![Tests: 113 Passed](https://img.shields.io/badge/tests-113%20passing%20(100%25)-brightgreen.svg)]()
+[![Tests: 111 Passed](https://img.shields.io/badge/tests-111%20passing%20(100%25)-brightgreen.svg)]()
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Platform: Windows | Linux | macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
-[![License: Commercial](https://img.shields.io/badge/license-Commercial-informational.svg)]()
+[![License: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](../LICENSE)
 
 **Ren'Py Inspector** es una plataforma profesional de escritorio y CLI para análisis estático, aseguramiento de calidad (QA) y auditoría continua diseñada específicamente para desarrolladores y estudios de novelas visuales sobre el motor [Ren'Py](https://www.renpy.org/).
 
@@ -56,7 +56,7 @@ Para una guía paso a paso, consulta el [Manual de Usuario (USER_GUIDE.es.md)](U
 * **Reporte JSON Estructurado**: Esquema versionado v1.0.0 listo para ingesta en sistemas de QA, SonarQube, dashboards corporativos o herramientas personalizadas.
 
 ### Compilación Standalone para Windows (.exe)
-* Especificación PyInstaller optimizada (`renpy_inspector.spec`) y scripts de compilación listos para generar el ejecutable `.exe` independiente sin requerir Python instalado en la máquina del usuario final.
+* Especificación PyInstaller optimizada (`scripts/renpy_inspector.spec`) y scripts de compilación listos para generar el ejecutable `.exe` independiente sin requerir Python instalado en la máquina del usuario final.
 
 ---
 
@@ -197,7 +197,7 @@ renpy-inspector "C:/Juegos/MiProyectoRenpy" --export-html reporte_qa.html --expo
 
 ## 8. Compilación Standalone para Windows (.exe)
 
-Ren'Py Inspector incluye una configuración completa de PyInstaller (`renpy_inspector.spec`) para generar un ejecutable `.exe` 100% autónomo y portable que no requiere Python en la máquina destino:
+Ren'Py Inspector incluye una configuración completa de PyInstaller (`scripts/renpy_inspector.spec`) para generar un ejecutable `.exe` 100% autónomo y portable que no requiere Python en la máquina destino:
 
 ```powershell
 # Opción 1: Compilar mediante el script automatizado de PowerShell

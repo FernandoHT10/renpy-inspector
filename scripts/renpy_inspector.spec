@@ -3,6 +3,8 @@
 
 from pathlib import Path
 
+ROOT_DIR = Path(SPECPATH).resolve().parent if Path(SPECPATH).name == "scripts" else Path(SPECPATH).resolve()
+
 # Collect submodules and hidden imports
 hiddenimports = [
     "PySide6",
@@ -70,8 +72,8 @@ hiddenimports = [
 block_cipher = None
 
 a = Analysis(
-    ["renpy_inspector/gui/app.py"],
-    pathex=["."],
+    [str(ROOT_DIR / "renpy_inspector" / "gui" / "app.py")],
+    pathex=[str(ROOT_DIR)],
     binaries=[],
     datas=[],
     hiddenimports=hiddenimports,
