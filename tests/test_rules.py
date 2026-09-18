@@ -556,9 +556,15 @@ label start:
     rule = UndefinedScreenRule()
     issues = rule.analyze(ctx)
     assert len(issues) == 3
-    assert any("via 'call screen'" in i.message and "missing_screen_a" in i.message for i in issues)
-    assert any("via 'show screen'" in i.message and "missing_screen_b" in i.message for i in issues)
-    assert any("via 'hide screen'" in i.message and "missing_screen_c" in i.message for i in issues)
+    a = next(i for i in issues if "missing_screen_a" in i.title)
+    b = next(i for i in issues if "missing_screen_b" in i.title)
+    c = next(i for i in issues if "missing_screen_c" in i.title)
+    assert a.severity == Severity.ERROR
+    assert b.severity == Severity.ERROR
+    assert c.severity == Severity.WARNING
+    assert "via 'call screen'" in a.message
+    assert "via 'show screen'" in b.message
+    assert "via 'hide screen'" in c.message
 
 
 def test_custom_text_tags_dynamic_rule(tmp_path: Path):

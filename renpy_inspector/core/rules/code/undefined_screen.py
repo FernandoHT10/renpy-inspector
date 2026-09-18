@@ -32,26 +32,44 @@ class UndefinedScreenRule(Rule):
                 continue
 
             if screen_name not in context.defined_screens:
+                is_hide = call.screen_action == "hide"
+                severity = Severity.WARNING if is_hide else Severity.ERROR
                 action_desc = (
                     f"'{call.screen_action} screen'"
                     if call.screen_action
                     else "'screen statement'"
                 )
+                if is_hide:
+                    message = (
+                        f"Screen '{screen_name}' referenced via {action_desc} is not defined "
+                        "in any script file. In Ren'Py, hiding an undefined screen does not crash "
+                        "at runtime, but indicates obsolete cleanup or an unmatched "
+                        "screen/tag name."
+                    )
+                    suggestion = (
+                        f"Verify if 'screen {screen_name}:' was renamed, or remove this obsolete "
+                        f"{action_desc} statement."
+                    )
+                else:
+                    message = (
+                        f"Screen '{screen_name}' referenced via {action_desc} is not defined "
+                        "in any script file or Ren'Py standard screens. Reaching this statement "
+                        f"will cause a fatal runtime crash: 'ScreenNotFound: {screen_name}'."
+                    )
+                    suggestion = (
+                        f"Define 'screen {screen_name}:' in your screens.rpy or correct "
+                        "the screen name if misspelled."
+                    )
+
                 issues.append(
                     Issue.create(
                         rule_id=self.rule_id,
-                        severity=self.default_severity,
+                        severity=severity,
                         category=self.category,
                         title=f"Undefined Screen '{screen_name}'",
-                        message=(
-                            f"Screen '{screen_name}' referenced via {action_desc} is not defined "
-                            "in any script file or Ren'Py standard screens."
-                        ),
+                        message=message,
                         location=call.location,
-                        suggestion=(
-                            f"Define 'screen {screen_name}:' in your screens.rpy or correct "
-                            "the screen name if misspelled."
-                        ),
+                        suggestion=suggestion,
                     )
                 )
 
