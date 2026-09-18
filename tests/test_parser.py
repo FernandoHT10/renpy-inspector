@@ -653,3 +653,61 @@ label start:
     assert len(res.dialogues) == 1
     assert res.dialogues[0].text == r'If you set {b}distribution=\"gaussian\"{/b}, then it works.'
 
+
+def test_menu_item_with_escaped_quotes():
+    """Test that choices in menus containing escaped quotes are recognized."""
+    script = r'''
+label start:
+    menu:
+        with dissolve
+        "\"Which is the safe door?\" Then go through the other door.":
+            $ points += 1
+        "\"Ignore me if you agree to give me a blowjob\"":
+            $ points += 2
+        '\'Single quote choice\'':
+            pass
+    return
+'''
+    res = parse_string(script)
+    assert len(res.menus) == 1
+    assert res.menus[0].item_count == 3
+
+
+def test_multiline_dialogue_does_not_trigger_broken_calls():
+    """Test that multiline dialogue lines starting with keywords like 'call'
+    are not parsed as call statements.
+    """
+    script = '''
+label start:
+    dr "And if you encounter any issues... don't hesitate to
+    call for me. I'll be on this station."
+    dr "Here is another line that starts with
+    jump to the rescue."
+    call actual_routine
+    return
+
+label actual_routine:
+    return
+'''
+    res = parse_string(script)
+    assert len(res.calls) == 1
+    assert res.calls[0].target == "actual_routine"
+    assert len(res.jumps) == 0
+
+
+def test_multiline_quote_reset_at_top_level_label():
+    """Test that an unclosed standard quote is defensively terminated at next top-level label."""
+    script = '''
+label start:
+    "forgot closing quote
+label next_label:
+    call valid_target
+    return
+'''
+    res = parse_string(script)
+    assert len(res.labels) == 2
+    assert [lbl.name for lbl in res.labels] == ["start", "next_label"]
+    assert len(res.calls) == 1
+    assert res.calls[0].target == "valid_target"
+
+

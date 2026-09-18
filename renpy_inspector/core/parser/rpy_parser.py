@@ -32,7 +32,7 @@ from renpy_inspector.core.parser.source import SourceFile, SourceLoader
 RE_LABEL = re.compile(r"^label\s+([\w\.]+)(?:\s*\((.*)\))?\s*:$", re.UNICODE)
 RE_MENU = re.compile(r"^menu\s+([\w\.]+)(?:\s*\((.*)\))?\s*:$", re.UNICODE)
 RE_MENU_ITEM = re.compile(
-    r'^(?:"([^"]+)"|\'([^\']+)\')(?:\s*\(.*?\))?(?:\s+if\s+.*)?\s*:$',
+    r'^(?:"((?:\\.|[^"\\])+)"|\'((?:\\.|[^\'\\])+)\')(?:\s*\(.*?\))?(?:\s+if\s+.*)?\s*:$',
     re.UNICODE,
 )
 RE_SCREEN = re.compile(r"^screen\s+([\w\.]+)(?:\s*\((.*)\))?.*:$", re.UNICODE)
@@ -187,7 +187,11 @@ class RpyParser:
 
                 # 1. Check if we are inside a Python block
                 if active_python_block is not None:
-                    if line.is_empty or line.indent > python_block_indent:
+                    if (
+                        line.is_empty
+                        or line.indent > python_block_indent
+                        or line.is_multiline_string_continuation
+                    ):
                         if not line.is_empty:
                             last_python_line_num = line.line_number
                             if "register_channel" in line.stripped_code:
@@ -245,7 +249,11 @@ class RpyParser:
                         active_python_block = None
 
                 # Check if indentation returned to outer scope; finalize screen block
-                if active_screen_indent is not None and not line.is_empty:
+                if (
+                    active_screen_indent is not None
+                    and not line.is_empty
+                    and not line.is_multiline_string_continuation
+                ):
                     if line.indent <= active_screen_indent:
                         active_screen_indent = None
                         active_screen_index = -1
@@ -258,7 +266,11 @@ class RpyParser:
                             )
 
                 # Check if indentation returned to outer scope; finalize menu block
-                if active_menu_indent is not None and not line.is_empty:
+                if (
+                    active_menu_indent is not None
+                    and not line.is_empty
+                    and not line.is_multiline_string_continuation
+                ):
                     if line.indent > active_menu_indent:
                         if RE_MENU_ITEM.match(line.stripped_code):
                             active_menu_item_count += 1

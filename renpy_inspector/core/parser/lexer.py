@@ -43,35 +43,37 @@ def strip_comment_and_track_strings(
     i = 0
     n = len(line)
     quote_char: Optional[str] = None
-    is_multiline = False
+    is_triple = False
 
     # If already inside a multiline string from a previous line
     if active_multiline_quote is not None:
         quote_char = active_multiline_quote
-        is_multiline = True
+        is_triple = len(active_multiline_quote) >= 3
 
     while i < n:
-        # If currently inside a multiline string, look for closing triple quote
-        if is_multiline:
-            assert quote_char is not None
+        # If currently inside a multiline triple-quoted string
+        if quote_char is not None and is_triple:
+            if line[i] == "\\":
+                i += 2
+                continue
             if line[i : i + 3] == quote_char:
                 # Closed multiline string
                 i += 3
                 quote_char = None
-                is_multiline = False
+                is_triple = False
                 continue
             i += 1
             continue
 
-        # If currently inside a single-line string (" or ')
-        if quote_char is not None:
+        # If currently inside a single or multiline standard string (" or ')
+        if quote_char is not None and not is_triple:
             char = line[i]
             if char == "\\":
                 # Escaped character, skip next character
                 i += 2
                 continue
             if char == quote_char:
-                # Closed single-line string
+                # Closed string
                 quote_char = None
                 i += 1
                 continue
@@ -81,13 +83,14 @@ def strip_comment_and_track_strings(
         # Not in any string: check for triple quotes start
         if line[i : i + 3] in ('"""', "'''"):
             quote_char = line[i : i + 3]
-            is_multiline = True
+            is_triple = True
             i += 3
             continue
 
         # Check for single quotes start
         if line[i] in ('"', "'"):
             quote_char = line[i]
+            is_triple = False
             i += 1
             continue
 
@@ -102,7 +105,7 @@ def strip_comment_and_track_strings(
     # End of line reached
     code_part = line
     comment_part = None
-    new_multiline = quote_char if is_multiline else None
+    new_multiline = quote_char
     return code_part, comment_part, new_multiline
 
 
@@ -119,13 +122,21 @@ class ScriptLexer:
         multiline_quote: Optional[str] = None
 
         for idx, raw_line in enumerate(lines, start=1):
-            # Track if this line started inside an active multiline string
-            was_in_multiline = multiline_quote is not None
-
             # Expand tabs to 4 spaces for consistent indentation measurement
             expanded = raw_line.expandtabs(4)
             unindented = expanded.lstrip()
             indent = len(expanded) - len(unindented)
+
+            # Defensive safeguard: if a standard quote was left open, but we encounter a
+            # top-level block declaration at indent 0, avoid swallowing subsequent declarations.
+            if multiline_quote is not None and len(multiline_quote) == 1:
+                if indent == 0 and unindented.startswith(
+                    ("label ", "init ", "screen ", "define ", "default ")
+                ):
+                    multiline_quote = None
+
+            # Track if this line started inside an active multiline string
+            was_in_multiline = multiline_quote is not None
 
             code_part, comment, multiline_quote = strip_comment_and_track_strings(
                 expanded, active_multiline_quote=multiline_quote
