@@ -866,3 +866,38 @@ init python:
     assert "truly_unused_cutscene.png" in issues[0].message
 
 
+def test_escaped_braces_in_text_tags(tmp_path: Path):
+    scripts = {
+        "script.rpy": """
+label start:
+    "Sometimes using {{b} tag looks different than {b}bold{/b}."
+    "A literal brace {{color=#fff} is not a tag."
+    "Formula with braces {{x + 1}} works fine."
+"""
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = UnclosedTextTagsRule()
+    issues = rule.analyze(ctx)
+    assert len(issues) == 0
+
+
+def test_missing_translation_large_capping(tmp_path: Path):
+    # Simulate 30 missing dialogue IDs in french
+    scripts = {
+        "tl/spanish/script.rpy": "\n".join(
+            f"translate spanish line_{i:03d}:\n    'Texto {i}'"
+            for i in range(30)
+        ),
+        "tl/french/script.rpy": "translate french line_000:\n    'Texte 0'",
+    }
+    ctx = create_test_context(tmp_path, scripts)
+    rule = MissingTranslationRule()
+    issues = rule.analyze(ctx)
+    # 25 detailed issues + 1 summary issue = 26
+    assert len(issues) == 26
+    summary = [i for i in issues if "detailed above" in i.message]
+    assert len(summary) == 1
+    assert summary[0].metadata.get("total_missing") == 29
+
+
+

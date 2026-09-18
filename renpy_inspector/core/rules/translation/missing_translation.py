@@ -39,14 +39,18 @@ class MissingTranslationRule(BaseRule):
                 if ident not in ("strings", "python", "style") and not ident.startswith("style "):
                     all_dialogue_ids.add(ident)
 
+        max_per_lang = 25
+
         for lang in sorted(real_languages):
             lang_ids = {
                 tr.identifier for tr in context.translations_by_lang[lang]
             }
-            missing_ids = all_dialogue_ids - lang_ids
+            missing_ids = sorted(all_dialogue_ids - lang_ids)
+            if not missing_ids:
+                continue
 
-            # Sort missing IDs deterministically
-            for missing_id in sorted(missing_ids):
+            # Emit detailed issues up to max_per_lang
+            for missing_id in missing_ids[:max_per_lang]:
                 msg = f"Translation block '{missing_id}' is missing in language '{lang}'."
                 sug = (
                     f"Generate updated translations with Ren'Py Launcher or add "
@@ -58,6 +62,25 @@ class MissingTranslationRule(BaseRule):
                         location=Location(file_path=f"game/tl/{lang}/script.rpy"),
                         suggestion=sug,
                         metadata={"language": lang, "missing_identifier": missing_id},
+                    )
+                )
+
+            # If there are many missing blocks, emit a consolidated summary issue
+            if len(missing_ids) > max_per_lang:
+                msg = (
+                    f"Language '{lang}' is missing {len(missing_ids)} translation blocks in total "
+                    f"({max_per_lang} detailed above)."
+                )
+                sug = (
+                    f"Run 'Generate Translations' in Ren'Py Launcher to create the "
+                    f"{len(missing_ids) - max_per_lang} remaining translation stubs for '{lang}'."
+                )
+                issues.append(
+                    self.create_issue(
+                        message=msg,
+                        location=Location(file_path=f"game/tl/{lang}/script.rpy"),
+                        suggestion=sug,
+                        metadata={"language": lang, "total_missing": len(missing_ids)},
                     )
                 )
 

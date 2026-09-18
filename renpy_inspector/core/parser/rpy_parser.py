@@ -323,7 +323,9 @@ class RpyParser:
                     for m1, m2 in RE_QUOTED_STRING.findall(code):
                         text = m1 or m2
                         if "{" in text and "}" in text:
-                            result.dialogues.append(
+                            clean_t = text.replace("{{", "").replace("}}", "")
+                            if "{" in clean_t and "}" in clean_t:
+                                result.dialogues.append(
                                 DialogueLine(
                                     text=text,
                                     location=Location(

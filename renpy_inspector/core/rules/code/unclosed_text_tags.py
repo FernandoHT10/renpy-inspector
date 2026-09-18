@@ -52,12 +52,17 @@ class UnclosedTextTagsRule(BaseRule):
             if "{" not in text or "}" not in text:
                 continue
 
+            # In Ren'Py text syntax, '{{' escapes '{' and '}}' escapes '}'.
+            clean_text = text.replace("{{", "\u0001").replace("}}", "\u0002")
+            if "{" not in clean_text or "}" not in clean_text:
+                continue
+
             stack: list[tuple[str, bool]] = []
             last_end = 0
             has_seen_text = False
 
-            for tag_match in RE_TEXT_TAG.finditer(text):
-                between = text[last_end : tag_match.start()]
+            for tag_match in RE_TEXT_TAG.finditer(clean_text):
+                between = clean_text[last_end : tag_match.start()]
                 cleaned_between = (
                     between.replace("\\n", "")
                     .replace("\\t", "")
