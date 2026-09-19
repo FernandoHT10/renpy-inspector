@@ -6,7 +6,7 @@
 [![GUI: PySide6](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-success.svg)](https://wiki.qt.io/Qt_for_Python)
 [![Static Analysis](https://img.shields.io/badge/analysis-100%25%20Static%20%26%20Safe-brightgreen.svg)]()
 [![Rules: 20 Core](https://img.shields.io/badge/rules-20%20Core%20Rules-blueviolet.svg)]()
-[![Tests: 111 Passed](https://img.shields.io/badge/tests-111%20passing%20(100%25)-brightgreen.svg)]()
+[![Tests: 180 Passed](https://img.shields.io/badge/tests-180%20passing%20(100%25)-brightgreen.svg)]()
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Platform: Windows | Linux | macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](../LICENSE)
@@ -49,15 +49,15 @@ Para una guía paso a paso, consulta el [Manual de Usuario (USER_GUIDE.es.md)](U
 
 ### Herramienta CLI para Pipelines e Integración Continua (CI/CD)
 * Salida formateada y enriquecida en terminal con resumen estadístico y desglose por severidad y archivo.
-* Códigos de salida estándar para fallar automáticamente builds de CI ante errores críticos (`exit 1` en presencia de fallos; `exit 0` si está limpio).
-* Flags `--severity`, `--category`, `--show-info`, `--export-json` y `--export-html` para automatización desatendida.
+* Códigos de salida estándar para fallar automáticamente builds de CI ante errores críticos (`exit 1` en presencia de fallos; `exit 0` si está limpio; `exit 2` ante errores de sistema o ejecución).
+* Flags de resiliencia y filtrado: `--severity`, `--category`, `--show-info`, `--allow-partial`, `--allow-rule-failures`, `--fail-fast`, `--export-json` y `--export-html` para automatización desatendida.
 
 ### Reportes Multi-Formato Autónomos
 * **Reporte HTML Autónomo**: Archivo HTML único y autocontenido (zero dependencias CDN, CSS/JS embebidos) con motor de búsqueda interactivo, filtros de severidad y diseño responsivo para enviar a directores de arte, guionistas o traductores.
-* **Reporte JSON Estructurado**: Esquema versionado v1.0.0 listo para ingesta en sistemas de QA, SonarQube, dashboards corporativos o herramientas personalizadas.
+* **Reporte JSON Estructurado**: Esquema versionado v2.0.0 listo para ingesta en sistemas de QA, SonarQube, dashboards corporativos o herramientas personalizadas.
 
 ### Compilación Standalone para Windows (.exe)
-* Especificación PyInstaller optimizada (`scripts/renpy_inspector.spec`) y scripts de compilación listos para generar el ejecutable `.exe` independiente sin requerir Python instalado en la máquina del usuario final.
+* Especificación PyInstaller optimizada (`scripts/renpy_inspector.spec`) y scripts de compilación listos para generar el ejecutable `.exe` independiente y portable sin requerir Python instalado en la máquina del usuario final.
 
 ---
 
@@ -94,20 +94,20 @@ Ren'Py Inspector cuenta con un motor determinista con **20 reglas estáticas** d
 
 Ren'Py Inspector no es un simple buscador de texto por regex; implementa un motor de parsing léxico y sintáctico con semántica profunda del motor Ren'Py:
 
-1. **Resolución Recursiva por Stem de Audio**:
-   Ren'Py permite reproducir audios especificando únicamente el nombre base o resolviendo archivos dentro de `game/audio/`, `game/voice/`, `game/music/` o subdirectorios profundos. Ren'Py Inspector indexa los stems y subrutas para evitar falsos positivos de audios no encontrados.
+1. **Resolución Recursiva por Stem de Audio y Namespace `audio.*`**:
+   Ren'Py permite reproducir audios especificando el nombre base, resolviendo archivos dentro de `game/audio/`, `game/voice/`, `game/music/` o subdirectorios profundos, así como usando referencias al almacén `audio.<nombre>`. Ren'Py Inspector indexa stems, modela el namespace `audio.*` y procesa cláusulas de reproducción (`<loop ...>`, `<from ...>`) para evitar falsos positivos de audios no encontrados.
 
 2. **Jerarquía y Alias de Nombres de Imágenes**:
    Soporta la convención de Ren'Py donde sentencias como `show eileen happy` pueden corresponder tanto a `game/images/eileen happy.png` como a subcarpetas como `game/images/eileen/happy.png`.
 
-3. **Screen Actions y Referencias de Runtime**:
-   Inspecciona botones y componentes de interfaz que usan acciones de pantalla como `action [Jump("capitulo_2"), Show("menu_inventario")]`, así como llamadas de runtime de Python en scripts (`renpy.jump("...")`, `renpy.call("...")`, `renpy.show_screen("...")`).
+3. **Extracción AST de Screen Actions y Referencias de Runtime**:
+   Inspecciona botones y componentes de interfaz mediante un extractor sintáctico (AST) dedicado para acciones de pantalla como `action [Jump("capitulo_2"), Show("menu_inventario")]` y llamadas de Python (`renpy.jump("...")`, `renpy.call("...")`, `renpy.show_screen("...")`), permaneciendo 100% inmune a falsos positivos provenientes de textos de diálogo narrativo.
 
 4. **Signaturas Multilínea de Pantallas**:
    Analiza definiciones complejas de pantallas con múltiples argumentos y tuplas distribuidas a lo largo de varias líneas sin perder la referencia del nodo.
 
-5. **Sintaxis de Menús con Argumentos y Menús Nombrados en Línea**:
-   Soporta menús con parámetros de pantalla (`menu (screen="choice_wheel"):`), opciones de menú con argumentos (`"Opción" (arg=True):`) y menús nombrados en línea (`menu selector_de_camino:`), evitando falsos positivos de labels no utilizados o saltos rotos.
+5. **Pila de Menús Anidados y Conteo Estructural de Opciones**:
+   Soporta menús anidados dentro de condicionales `if/elif/else` o sub-menús mediante una pila estructural inmune a líneas vacías o comentarios, calculando con exactitud el conteo directo de opciones seleccionables (`items_indent`) para prevenir falsos positivos de menús vacíos (`RPY-CODE-009`).
 
 6. **Validador de Etiquetas de Formato de Diálogo**:
    Reconoce la totalidad de etiquetas de estilo de texto de Ren'Py (`{b}`, `{i}`, `{u}`, `{s}`, `{size}`, `{color}`, `{font}`, `{cps}`, `{alpha}`, etc.) ignorando etiquetas de autocierre (`{w}`, `{p}`, `{nw}`, `{fast}`) o etiquetas escapadas con llaves dobles.

@@ -6,7 +6,7 @@
 [![GUI: PySide6](https://img.shields.io/badge/GUI-PySide6%20(Qt6)-success.svg)](https://wiki.qt.io/Qt_for_Python)
 [![Static Analysis](https://img.shields.io/badge/analysis-100%25%20Static%20%26%20Safe-brightgreen.svg)]()
 [![Rules: 20 Core](https://img.shields.io/badge/rules-20%20Core%20Rules-blueviolet.svg)]()
-[![Tests: 111 Passed](https://img.shields.io/badge/tests-111%20passing%20(100%25)-brightgreen.svg)]()
+[![Tests: 180 Passed](https://img.shields.io/badge/tests-180%20passing%20(100%25)-brightgreen.svg)]()
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Platform: Windows | Linux | macOS](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](LICENSE)
@@ -49,12 +49,12 @@ For a detailed step-by-step walkthrough, see the [User Guide (docs/USER_GUIDE.md
 
 ### CLI Tool for CI/CD Automation & Pipelines
 * Formatted terminal output with clean statistical breakdown and categorized notices.
-* Standard POSIX exit codes to automatically fail continuous integration builds on critical errors (`exit 1` on critical issues; `exit 0` when clean).
-* `--severity`, `--category`, `--show-info`, `--export-json`, and `--export-html` flags for headless workflows.
+* Standard POSIX exit codes for continuous integration pipelines (`exit 0` when clean; `exit 1` on critical defects; `exit 2` on system or parse execution failures).
+* Resilience & gate flags: `--severity`, `--category`, `--show-info`, `--allow-partial`, `--allow-rule-failures`, `--fail-fast`, `--export-json`, and `--export-html` for headless workflows.
 
 ### Autonomous Multi-Format Reporting
 * **Interactive Standalone HTML Report**: Single, self-contained `.html` file (zero CDN dependencies, embedded CSS/JS) featuring client-side search, severity filters, and responsive design to share with scriptwriters, artists, or translators.
-* **Structured JSON Report**: Versioned v1.0.0 schema ready for ingestion into custom QA dashboards, SonarQube, or analytics pipelines.
+* **Structured JSON Report**: Versioned Schema v2.0.0 ready for ingestion into custom QA dashboards, SonarQube, or analytics pipelines.
 
 ### Windows Standalone Executable (.exe)
 * Optimized PyInstaller specification (`scripts/renpy_inspector.spec`) and build scripts to generate a single-file portable `.exe` that runs without requiring Python on target machines.
@@ -94,20 +94,20 @@ Ren'Py Inspector features **20 deterministic static analysis rules** across 6 ca
 
 Ren'Py Inspector goes far beyond basic regex search; it features a dedicated parser with deep engine semantics:
 
-1. **Recursive Audio Stem Resolution**:
-   Ren'Py permits playing audio using only a short stem name, resolving files automatically inside `game/audio/`, `game/voice/`, `game/music/`, or nested subdirectories. The inspector recursively indexes stems to avoid false alarms.
+1. **Recursive Audio Stem Resolution & `audio.*` Namespace**:
+   Ren'Py permits playing audio using short stem names, resolving files inside `game/audio/`, `game/voice/`, `game/music/` or nested directories, as well as store symbol references like `audio.<symbol>`. Ren'Py Inspector indexes stems, models the `audio.*` store namespace, and strips playback clauses (`<loop ...>`, `<from ...>`) to prevent false missing audio errors.
 
 2. **Hierarchical Image Tag & Directory Resolution**:
    Supports Ren'Py's image naming conventions where `show eileen happy` can match both `game/images/eileen happy.png` and subdirectories like `game/images/eileen/happy.png`.
 
-3. **Screen Actions & Runtime Invocations**:
-   Inspects button actions such as `action [Jump("chapter_2"), Show("inventory_menu")]`, as well as Python runtime invocations (`renpy.jump("...")`, `renpy.call("...")`, `renpy.show_screen("...")`).
+3. **AST-Based Screen Action Extraction & Runtime Invocations**:
+   Inspects button and screen components using a dedicated Abstract Syntax Tree (AST) extractor for screen actions like `action [Jump("chapter_2"), Show("inventory_menu")]` and Python runtime invocations (`renpy.jump("...")`, `renpy.call("...")`, `renpy.show_screen("...")`), completely eliminating false positives from narrative dialogue text.
 
 4. **Multiline Screen Signatures**:
    Parses complex screen definitions with multiple default arguments and tuples spanning across multiple physical lines.
 
-5. **Menus with Arguments & Inline Named Menus**:
-   Supports screen arguments (`menu (screen="choice_wheel"):`), choice arguments (`"Option" (arg=True):`), and inline named menus (`menu branch_selector:`), preventing false unused label warnings.
+5. **Indentation-Based Nested Menu Stack**:
+   Supports complex nested menus inside `if/elif/else` conditionals or sub-menus using an indentation-based stack immune to blank lines and comments, accurately calculating direct selectable choices (`items_indent`) to prevent spurious empty menu crashes (`RPY-CODE-009`).
 
 6. **Dialogue Formatting Tag Validator**:
    Validates standard Ren'Py text tags (`{b}`, `{i}`, `{u}`, `{s}`, `{size}`, `{color}`, `{font}`, `{cps}`, `{alpha}`) while ignoring self-closing tags (`{w}`, `{p}`, `{nw}`, `{fast}`) and escaped double brackets.

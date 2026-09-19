@@ -13,12 +13,16 @@ Este manual explica detalladamente cómo utilizar la herramienta en sus modalida
 Ren'Py Inspector puede ejecutarse de tres formas según tu entorno de trabajo:
 
 ### 1.1 Ejecutable Standalone de Windows (`RenPyInspector.exe`)
-Si dispones de la versión compilada para Windows, no requieres instalar Python ni dependencias externas:
-* **Doble clic**: Haz doble clic sobre `RenPyInspector.exe` para abrir la interfaz gráfica de inmediato.
+La versión compilada para Windows es 100% portable y **no requiere instalar Python, librerías externas ni permisos de administrador**:
+* **Uso Directo (Usuarios no técnicos)**: Haz doble clic sobre `RenPyInspector.exe` en el Explorador de Windows para abrir la interfaz gráfica de inmediato.
+* **Flujo Portátil**: Puedes copiar `RenPyInspector.exe` a un pendrive USB o compartirlo con guionistas, traductores y testers de QA que no tengan Python configurado.
+* **Arrastrar y Soltar (Drag & Drop)**: Arrastra la carpeta de tu juego Ren'Py directamente sobre la ventana para comenzar la inspección al instante.
 * **Desde PowerShell / CMD**:
   ```powershell
+  # Abrir la interfaz gráfica
   .\RenPyInspector.exe
-  # O abrir un proyecto específico directamente
+
+  # Abrir un proyecto específico directamente en la GUI
   .\RenPyInspector.exe "C:\Juegos\MiProyectoRenpy"
   ```
 
@@ -118,13 +122,46 @@ renpy-inspector "C:/Juegos/MiProyectoRenpy" --category Code
 
 # Generar ambos reportes de forma desatendida (HTML interactivo y JSON estructurado)
 renpy-inspector "C:/Juegos/MiProyectoRenpy" --export-html "reports/qa.html" --export-json "reports/qa.json"
+
+# Resiliencia en CI/CD: Permitir finalizar con éxito aunque algún script heredado falle al parsearse
+renpy-inspector "C:/Juegos/MiProyectoRenpy" --allow-partial
+
+# Depuración del motor: Detenerse de inmediato ante la primera excepción no capturada de una regla
+renpy-inspector "C:/Juegos/MiProyectoRenpy" --fail-fast
+
+# Tolerancia a fallos: Continuar escaneando y registrar fallos de reglas sin abortar
+renpy-inspector "C:/Juegos/MiProyectoRenpy" --allow-rule-failures
 ```
 
 > **Nota de compatibilidad**: Todos los comandos admiten indistintamente tanto el ejecutable directo `renpy-inspector` como la sintaxis `python -m renpy_inspector`.
 
-### Códigos de Salida (Exit Codes para CI/CD)
-* `0`: El proyecto está limpio y no contiene problemas que alcancen el umbral de severidad establecido.
-* `1`: El proyecto contiene uno o más errores de severidad `ERROR` o `CRITICAL` (o problemas que superen el umbral `--severity`), o la ruta especificada no es un proyecto Ren'Py válido.
+### Referencia Completa de Argumentos CLI
+
+| Flag / Parámetro | Argumento | Descripción |
+| :--- | :--- | :--- |
+| `project_path` | `<ruta>` | Ruta al directorio raíz de Ren'Py o directamente a la carpeta `game/`. |
+| `--gui` | *Ninguno* | Inicia la interfaz gráfica de escritorio. |
+| `--show-info` | *Ninguno* | Muestra incidencias de nivel `INFO` (ej. assets potencialmente sin uso). |
+| `--severity` | `CRITICAL\|ERROR\|WARNING\|INFO` | Umbral de severidad mínima a reportar y verificar. |
+| `--category` | `<nombre>` | Filtra incidencias por dominio (`Code`, `Assets`, `Audio`, `Images`, `Translation`, `References`). |
+| `--export-html` | `<ruta.html>` | Guarda un reporte interactivo 100% autocontenido en HTML. |
+| `--export-json` | `<ruta.json>` | Guarda un reporte estructurado en JSON versionado (Esquema v2.0.0). |
+| `--allow-partial` | *Ninguno* | Permite retornar código 0/1 incluso si algún archivo no pudo parsearse. |
+| `--allow-rule-failures`| *Ninguno* | Captura y registra excepciones en reglas individuales sin abortar el análisis. |
+| `--fail-fast` | *Ninguno* | Aborta la inspección inmediatamente ante la primera excepción de regla. |
+| `--version` | *Ninguno* | Muestra la versión instalada de Ren'Py Inspector. |
+
+### Códigos de Salida Estándar (Integración en CI/CD)
+
+Ren'Py Inspector implementa códigos de salida deterministas para pipelines de integración continua:
+
+* `0` (**EXIT_SUCCESS**): El proyecto está limpio o las incidencias detectadas no superan el umbral configurado (o se especificó `--allow-partial` / `--allow-rule-failures` ante fallos tolerados).
+* `1` (**EXIT_ISSUES_FOUND**): Se detectaron uno o más defectos que igualan o superan el umbral de severidad establecido (por defecto, cualquier `CRITICAL` o `ERROR`).
+* `2` (**EXIT_ERROR**): Fallo crítico del sistema o de ejecución:
+  - El directorio especificado no es un proyecto Ren'Py válido.
+  - Ocurrió una excepción no controlada en una regla (sin `--allow-rule-failures`).
+  - El análisis fue `PARTIAL` por fallos de scanner o parser (sin `--allow-partial`).
+  - La inspección fue cancelada por el usuario o entorno.
 
 ---
 
@@ -282,3 +319,37 @@ class RequireMusicVolumeInitRule(BaseRule):
 ```
 
 El cargador dinámico de plugins registrará la clase e integrará la regla en el ciclo de escaneo tanto en la CLI como en la interfaz gráfica.
+
+---
+
+## 9. Preguntas Frecuentes (FAQ) y Solución de Problemas
+
+### P1: ¿Por qué el inspector marca un audio como inexistente si en Windows se reproduce correctamente?
+**R**: El sistema de archivos de Windows no distingue entre mayúsculas y minúsculas (`audio/Tema.ogg` y `audio/tema.ogg` resuelven al mismo archivo), pero Linux, macOS, Android y Steam Deck sí distinguen mayúsculas de minúsculas estrictamente. Si el nombre del archivo en tu script no coincide carácter a carácter con el disco, el juego fallará con un crash en Steam Deck o Linux. La regla `RPY-REF-001` valida la concordancia exacta de mayúsculas/minúsculas para garantizar compatibilidad multiplataforma.
+
+### P2: ¿Cómo resuelve el inspector los audios invocados mediante `audio.<nombre>`?
+**R**: Ren'Py sitúa automáticamente cualquier pista de audio ubicada dentro de `game/audio/` en el almacén de variables `audio.*`. Por ejemplo, `game/audio/bgm_batalla.ogg` puede reproducirse como `play music audio.bgm_batalla`. Ren'Py Inspector modela este comportamiento con precisión y coteja los símbolos `audio.<nombre>` contra el catálogo de `game/audio/`, evitando falsos avisos de audios faltantes.
+
+### P3: ¿Cómo se manejan cláusulas de reproducción como `<loop 0>` o `<from 10.5>`?
+**R**: Ren'Py Inspector detecta, aísla y procesa las cláusulas de reproducción (ej. `play music "<loop 2.5>audio/musica.ogg"`) antes de verificar la presencia del archivo en disco, analizando limpiamente la ruta física sin reportar fallos espurios.
+
+### P4: ¿Cómo excluir librerías de terceros, carpetas de prueba o plantillas de traducción?
+**R**: Añade un archivo `renpy-inspector.toml` en la raíz de tu proyecto:
+```toml
+[tool.renpy-inspector]
+ignore_patterns = [
+    "game/tl/None/**",       # Plantilla base generada por Ren'Py
+    "game/python-packages/**",
+    "game/test/**",
+]
+```
+
+### P5: ¿Puedo compartir reportes con miembros del equipo sin Python instalado?
+**R**: ¡Sí! En la aplicación gráfica, presiona **Export HTML**, o bien ejecuta la CLI con `--export-html reporte.html`. El archivo resultante es 100% autocontenido (no requiere conexión a internet, fuentes externas ni dependencias CDN) y puede abrirse en cualquier navegador web moderno.
+
+### P6: Mi proyecto contiene scripts heredados con sintaxis no estándar que fallan al parsearse. ¿Puedo auditar el resto del juego?
+**R**: En la terminal, utiliza el parámetro `--allow-partial`:
+```bash
+renpy-inspector "C:/Juegos/MiProyecto" --allow-partial
+```
+Esto permite al motor registrar los archivos con errores como diagnósticos de infraestructura y continuar la evaluación de las 20 reglas estáticas sobre el resto del proyecto, devolviendo los códigos de salida estándar (0/1).
