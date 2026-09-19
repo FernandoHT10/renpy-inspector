@@ -1,12 +1,14 @@
 """Deterministic static parser for Ren'Py scripts (.rpy and .rpym)."""
 
 import re
+import textwrap
 from dataclasses import replace
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from renpy_inspector.core.models.enums import Severity
 from renpy_inspector.core.models.location import Location
+from renpy_inspector.core.models.resolution import parse_audio_target
 from renpy_inspector.core.models.symbols import (
     AudioReference,
     CallReference,
@@ -22,6 +24,12 @@ from renpy_inspector.core.models.symbols import (
     TranslateBlock,
     UnreachableStatement,
     VariableDeclaration,
+)
+from renpy_inspector.core.parser.action_extractor import (
+    ACTION_PROPERTY_PREFIXES,
+    ExtractedAction,
+    calculate_delimiter_balance,
+    extract_actions_from_ast,
 )
 from renpy_inspector.core.parser.errors import ParseError
 from renpy_inspector.core.parser.lexer import LogicalLine, ScriptLexer
@@ -158,9 +166,7 @@ class RpyParser:
         active_screen_indent: Optional[int] = None
         active_screen_index: int = -1
 
-        active_menu_indent: Optional[int] = None
-        active_menu_location: Optional[Location] = None
-        active_menu_item_count: int = 0
+        menu_stack: list[dict[str, Any]] = []
 
         pending_dead_stmt: Optional[str] = None
         pending_dead_indent: int = 0
@@ -168,10 +174,79 @@ class RpyParser:
 
         # Tracking state for multi-line Python blocks
         active_python_block: Optional[PythonBlock] = None
+        active_python_lines: list[LogicalLine] = []
         python_block_indent: int = 0
         last_python_line_num: int = 0
 
+        pending_action_lines: list[LogicalLine] = []
+        pending_action_balance: int = 0
+        pending_action_prop: Optional[str] = None
+
         skip_until_idx: int = -1
+
+        def _record_action(act: ExtractedAction, loc: Location) -> None:
+            if act.category == "jump":
+                result.jumps.append(
+                    JumpReference(
+                        target=act.target,
+                        location=loc,
+                        is_expression=act.is_expression,
+                        kind=act.kind,
+                        scope_label=current_global_label,
+                    )
+                )
+            elif act.category == "call":
+                result.calls.append(
+                    CallReference(
+                        target=act.target,
+                        location=loc,
+                        is_expression=act.is_expression,
+                        kind=act.kind,
+                        is_screen=False,
+                        scope_label=current_global_label,
+                    )
+                )
+            elif act.category == "screen":
+                result.calls.append(
+                    CallReference(
+                        target=act.target,
+                        location=loc,
+                        is_expression=act.is_expression,
+                        kind=act.kind,
+                        is_screen=True,
+                        screen_action=act.screen_action,
+                        scope_label=current_global_label,
+                    )
+                )
+
+        def _finalize_python_block_actions(
+            py_block: PythonBlock, py_lines: list[LogicalLine]
+        ) -> None:
+            if not py_lines:
+                return
+            block_code = textwrap.dedent("\n".join(pl.raw_text for pl in py_lines))
+            actions, err = extract_actions_from_ast(block_code, mode="exec")
+            if err:
+                result.errors.append(
+                    ParseError(
+                        file_path=py_block.location.file_path,
+                        line=py_block.location.line_number,
+                        column=py_block.location.column_number,
+                        message=f"Python syntax error in block: {err}",
+                        severity=Severity.WARNING,
+                        source_snippet=py_block.location.source_snippet,
+                    )
+                )
+            else:
+                for act in actions:
+                    src_l = py_lines[min(act.line_offset, len(py_lines) - 1)]
+                    loc = Location(
+                        file_path=src_l.file_path,
+                        line_number=src_l.line_number,
+                        column_number=src_l.column + act.column_offset,
+                        source_snippet=src_l.raw_text.strip(),
+                    )
+                    _record_action(act, loc)
 
         for line_idx, line in enumerate(lines):
             try:
@@ -194,6 +269,7 @@ class RpyParser:
                     ):
                         if not line.is_empty:
                             last_python_line_num = line.line_number
+                            active_python_lines.append(line)
                             if "register_channel" in line.stripped_code:
                                 m_reg = RE_REGISTER_CHANNEL.search(line.stripped_code)
                                 if m_reg:
@@ -203,40 +279,6 @@ class RpyParser:
                                     result.custom_text_tags.append(m_ct.group(1))
                                 for m_sc in RE_SELF_CLOSING_TEXT_TAG.finditer(line.stripped_code):
                                     result.custom_self_closing_text_tags.append(m_sc.group(1))
-                            code_py = line.stripped_code
-                            if ("Jump" in code_py or "renpy.jump" in code_py) and "(" in code_py:
-                                for m_jump in RE_ACTION_JUMP.finditer(code_py):
-                                    result.jumps.append(
-                                        JumpReference(
-                                            target=m_jump.group(1).strip(),
-                                            location=Location(
-                                                file_path=line.file_path,
-                                                line_number=line.line_number,
-                                                column_number=line.column,
-                                                source_snippet=line.raw_text.strip(),
-                                            ),
-                                            is_expression=False,
-                                            kind=ReferenceKind.STATIC,
-                                            scope_label=current_global_label,
-                                        )
-                                    )
-                            if ("Call" in code_py or "renpy.call" in code_py) and "(" in code_py:
-                                for m_call in RE_ACTION_CALL.finditer(code_py):
-                                    result.calls.append(
-                                        CallReference(
-                                            target=m_call.group(1).strip(),
-                                            location=Location(
-                                                file_path=line.file_path,
-                                                line_number=line.line_number,
-                                                column_number=line.column,
-                                                source_snippet=line.raw_text.strip(),
-                                            ),
-                                            is_expression=False,
-                                            kind=ReferenceKind.STATIC,
-                                            is_screen=False,
-                                            scope_label=current_global_label,
-                                        )
-                                    )
                         continue
                     else:
                         # Indentation returned to outer scope; finalize Python block
@@ -246,7 +288,9 @@ class RpyParser:
                             end_line=last_python_line_num,
                         )
                         result.python_blocks.append(completed_block)
+                        _finalize_python_block_actions(active_python_block, active_python_lines)
                         active_python_block = None
+                        active_python_lines = []
 
                 # Check if indentation returned to outer scope; finalize screen block
                 if (
@@ -265,27 +309,29 @@ class RpyParser:
                                 sc, variant=m_var.group(1).strip()
                             )
 
-                # Check if indentation returned to outer scope; finalize menu block
+                # Check if indentation returned to outer scope; finalize menu blocks
                 if (
-                    active_menu_indent is not None
+                    menu_stack
                     and not line.is_empty
                     and not line.is_multiline_string_continuation
+                    and line.stripped_code
                 ):
-                    if line.indent > active_menu_indent:
-                        if RE_MENU_ITEM.match(line.stripped_code):
-                            active_menu_item_count += 1
-                    else:
-                        if active_menu_location is not None:
-                            result.menus.append(
-                                MenuBlock(
-                                    location=active_menu_location,
-                                    item_count=active_menu_item_count,
-                                    scope_label=current_global_label,
-                                )
+                    while menu_stack and line.indent <= menu_stack[-1]["indent"]:
+                        popped = menu_stack.pop()
+                        result.menus.append(
+                            MenuBlock(
+                                location=popped["location"],
+                                item_count=popped["item_count"],
+                                scope_label=popped["scope_label"],
                             )
-                        active_menu_indent = None
-                        active_menu_location = None
-                        active_menu_item_count = 0
+                        )
+                    if menu_stack:
+                        top = menu_stack[-1]
+                        if line.indent > top["indent"] and RE_MENU_ITEM.match(line.stripped_code):
+                            if top["items_indent"] is None:
+                                top["items_indent"] = line.indent
+                            if line.indent == top["items_indent"]:
+                                top["item_count"] += 1
 
                 # 2. Skip empty lines or multiline string continuations
                 if line.is_empty or line.is_multiline_string_continuation:
@@ -352,112 +398,175 @@ class RpyParser:
                 # Track menu blocks
                 is_menu_stmt = code == "menu:" or code.startswith(("menu ", "menu:"))
                 if is_menu_stmt and active_screen_indent is None:
-                    if active_menu_indent is not None and active_menu_location is not None:
+                    while menu_stack and line.indent <= menu_stack[-1]["indent"]:
+                        popped = menu_stack.pop()
                         result.menus.append(
                             MenuBlock(
-                                location=active_menu_location,
-                                item_count=active_menu_item_count,
-                                scope_label=current_global_label,
+                                location=popped["location"],
+                                item_count=popped["item_count"],
+                                scope_label=popped["scope_label"],
                             )
                         )
-                    active_menu_indent = line.indent
-                    active_menu_location = Location(
-                        file_path=line.file_path,
-                        line_number=line.line_number,
-                        column_number=line.column,
-                        source_snippet=line.raw_text.strip(),
+                    menu_stack.append(
+                        {
+                            "location": Location(
+                                file_path=line.file_path,
+                                line_number=line.line_number,
+                                column_number=line.column,
+                                source_snippet=line.raw_text.strip(),
+                            ),
+                            "indent": line.indent,
+                            "items_indent": None,
+                            "item_count": 0,
+                            "scope_label": current_global_label,
+                        }
                     )
-                    active_menu_item_count = 0
 
-                # Screen actions / button actions (Jump, Call, Start, Show, Hide, etc.)
-                has_action_keyword = any(
-                    k in code
-                    for k in (
-                        "Jump",
-                        "Call",
-                        "Start",
-                        "Show",
-                        "Hide",
-                        "ToggleScreen",
-                        "ShowTransient",
-                        "CallScreen",
-                        "renpy.jump",
-                        "renpy.call",
-                        "show_screen",
-                        "hide_screen",
-                    )
-                )
-                if has_action_keyword and "(" in code:
-                    loc = Location(
-                        file_path=line.file_path,
-                        line_number=line.line_number,
-                        column_number=line.column,
-                        source_snippet=line.raw_text.strip(),
-                    )
-                    if "Jump" in code or "renpy.jump" in code:
-                        for m_jump in RE_ACTION_JUMP.finditer(code):
-                            result.jumps.append(
-                                JumpReference(
-                                    target=m_jump.group(1).strip(),
-                                    location=loc,
-                                    is_expression=False,
-                                    kind=ReferenceKind.STATIC,
-                                    scope_label=current_global_label,
+                # Screen Language handling: actions, multi-line action lists, and inline Python
+                if active_screen_indent is not None and line.indent > active_screen_indent:
+                    # 1. Multi-line action expression continuation
+                    if pending_action_lines:
+                        pending_action_lines.append(line)
+                        pending_action_balance += calculate_delimiter_balance(line.stripped_code)
+                        if pending_action_balance <= 0:
+                            raw_first = pending_action_lines[0].raw_text
+                            prop_len = len(pending_action_prop) if pending_action_prop else 0
+                            p_idx = (
+                                raw_first.find(pending_action_prop)
+                                if pending_action_prop
+                                else -1
+                            )
+                            first_clean = (
+                                raw_first[p_idx + prop_len :]
+                                if p_idx != -1
+                                else raw_first
+                            )
+                            cleaned_lines = [first_clean] + [
+                                al.raw_text for al in pending_action_lines[1:]
+                            ]
+                            full_expr = textwrap.dedent("\n".join(cleaned_lines))
+                            actions, _ = extract_actions_from_ast(full_expr, mode="eval")
+                            if not actions:
+                                actions, _ = extract_actions_from_ast(full_expr, mode="exec")
+                            for act in actions:
+                                max_idx = len(pending_action_lines) - 1
+                                src_l = pending_action_lines[min(act.line_offset, max_idx)]
+                                loc = Location(
+                                    file_path=src_l.file_path,
+                                    line_number=src_l.line_number,
+                                    column_number=src_l.column + act.column_offset,
+                                    source_snippet=src_l.raw_text.strip(),
+                                )
+                                _record_action(act, loc)
+                            pending_action_lines = []
+                            pending_action_balance = 0
+                            pending_action_prop = None
+                        continue
+
+                    # 2. Single-line Python statement inside screen
+                    if code.startswith("$"):
+                        py_stmt = code[1:].strip()
+                        actions, err = extract_actions_from_ast(py_stmt, mode="exec")
+                        if err:
+                            result.errors.append(
+                                ParseError(
+                                    file_path=line.file_path,
+                                    line=line.line_number,
+                                    column=line.column,
+                                    message=f"Python syntax error in screen '$' statement: {err}",
+                                    severity=Severity.WARNING,
+                                    source_snippet=line.raw_text.strip(),
                                 )
                             )
-                    if "Start" in code:
-                        for m_start in RE_ACTION_START.finditer(code):
-                            result.jumps.append(
-                                JumpReference(
-                                    target=m_start.group(1).strip(),
-                                    location=loc,
-                                    is_expression=False,
-                                    kind=ReferenceKind.STATIC,
-                                    scope_label=current_global_label,
-                                )
+                        else:
+                            loc = Location(
+                                file_path=line.file_path,
+                                line_number=line.line_number,
+                                column_number=line.column,
+                                source_snippet=line.raw_text.strip(),
                             )
-                    if "Call" in code or "renpy.call" in code:
-                        for m_call in RE_ACTION_CALL.finditer(code):
-                            result.calls.append(
-                                CallReference(
-                                    target=m_call.group(1).strip(),
-                                    location=loc,
-                                    is_expression=False,
-                                    kind=ReferenceKind.STATIC,
-                                    is_screen=False,
-                                    scope_label=current_global_label,
+                            for act in actions:
+                                _record_action(act, loc)
+                        continue
+
+                    # 3. Action properties on screen widgets/buttons
+                    for prop in ACTION_PROPERTY_PREFIXES:
+                        if prop in code:
+                            prop_idx = code.find(prop) + len(prop)
+                            expr_part = code[prop_idx:].strip()
+                            bal = calculate_delimiter_balance(expr_part)
+                            if bal > 0:
+                                pending_action_lines = [line]
+                                pending_action_balance = bal
+                                pending_action_prop = prop
+                                break
+                            else:
+                                actions, _ = extract_actions_from_ast(expr_part, mode="eval")
+                                if not actions:
+                                    actions, _ = extract_actions_from_ast(expr_part, mode="exec")
+                                loc = Location(
+                                    file_path=line.file_path,
+                                    line_number=line.line_number,
+                                    column_number=line.column,
+                                    source_snippet=line.raw_text.strip(),
                                 )
+                                for act in actions:
+                                    _record_action(act, loc)
+
+                    # Continue past screen lines so they are not parsed as script labels/dialogue
+                    continue
+
+                # Single-line Python outside screens
+                if code.startswith("$"):
+                    if "register_channel" in code:
+                        m_reg = RE_REGISTER_CHANNEL.search(code)
+                        if m_reg:
+                            result.registered_channels.append(m_reg.group(1))
+                    if "custom_text_tags" in code:
+                        for m_ct in RE_CUSTOM_TEXT_TAG.finditer(code):
+                            result.custom_text_tags.append(m_ct.group(1))
+                        for m_sc in RE_SELF_CLOSING_TEXT_TAG.finditer(code):
+                            result.custom_self_closing_text_tags.append(m_sc.group(1))
+
+                    py_stmt = code[1:].strip()
+                    actions, err = extract_actions_from_ast(py_stmt, mode="exec")
+                    if err:
+                        result.errors.append(
+                            ParseError(
+                                file_path=line.file_path,
+                                line=line.line_number,
+                                column=line.column,
+                                message=f"Python syntax error in '$' statement: {err}",
+                                severity=Severity.WARNING,
+                                source_snippet=line.raw_text.strip(),
                             )
-                    if any(
-                        s in code
-                        for s in (
-                            "Show",
-                            "Hide",
-                            "ToggleScreen",
-                            "ShowTransient",
-                            "CallScreen",
-                            "show_screen",
-                            "hide_screen",
                         )
-                    ):
-                        for m_scr in RE_ACTION_SCREEN.finditer(code):
-                            act_name = (
-                                m_scr.group(1)
-                                .replace("renpy.", "")
-                                .replace("_screen", "")
-                                .lower()
-                            )
-                            result.calls.append(
-                                CallReference(
-                                    target=m_scr.group(2).strip(),
-                                    location=loc,
-                                    is_expression=False,
-                                    kind=ReferenceKind.STATIC,
-                                    is_screen=True,
-                                    screen_action=act_name,
-                                    scope_label=current_global_label,
-                                )
-                            )
+                    else:
+                        loc = Location(
+                            file_path=line.file_path,
+                            line_number=line.line_number,
+                            column_number=line.column,
+                            source_snippet=line.raw_text.strip(),
+                        )
+                        for act in actions:
+                            _record_action(act, loc)
+                    continue
+
+                # Action assignments in define / default statements
+                if code.startswith(("define ", "default ")) and "=" in code:
+                    rhs = code.split("=", 1)[1].strip()
+                    if any(k in rhs for k in ("Jump", "Call", "Show", "Start", "renpy.")):
+                        actions, _ = extract_actions_from_ast(rhs, mode="eval")
+                        if not actions:
+                            actions, _ = extract_actions_from_ast(rhs, mode="exec")
+                        loc = Location(
+                            file_path=line.file_path,
+                            line_number=line.line_number,
+                            column_number=line.column,
+                            source_snippet=line.raw_text.strip(),
+                        )
+                        for act in actions:
+                            _record_action(act, loc)
 
                 # Fast keyword check: skip regex matching on dialogue / non-statements
                 if not code.startswith((
@@ -814,8 +923,7 @@ class RpyParser:
                     quoted_items = RE_QUOTED_ITEM.findall(list_body)
                     if quoted_items:
                         for raw_path in quoted_items:
-                            unquoted_audio = unquote_string(raw_path) or raw_path
-                            clean_audio = RE_AUDIO_CLAUSE.sub("", unquoted_audio)
+                            clauses, clean_audio, is_q = parse_audio_target(raw_path)
                             result.audios.append(
                                 AudioReference(
                                     channel=channel,
@@ -828,12 +936,16 @@ class RpyParser:
                                         source_snippet=line.raw_text.strip(),
                                     ),
                                     kind=ReferenceKind.STATIC,
+                                    is_quoted=True,
+                                    clauses=clauses,
+                                    clean_target=clean_audio,
                                 )
                             )
                     else:
                         for raw_item in list_body.split(","):
                             dyn_target = raw_item.strip()
                             if dyn_target:
+                                clauses, clean_dyn, is_q = parse_audio_target(dyn_target)
                                 result.audios.append(
                                     AudioReference(
                                         channel=channel,
@@ -846,6 +958,9 @@ class RpyParser:
                                             source_snippet=line.raw_text.strip(),
                                         ),
                                         kind=ReferenceKind.DYNAMIC,
+                                        is_quoted=False,
+                                        clauses=clauses,
+                                        clean_target=clean_dyn,
                                     )
                                 )
                     continue
@@ -855,8 +970,7 @@ class RpyParser:
                     action = m_audio_q.group(1)
                     channel = m_audio_q.group(2)
                     raw_path = m_audio_q.group(3)
-                    unquoted_audio = unquote_string(raw_path) or raw_path
-                    clean_audio = RE_AUDIO_CLAUSE.sub("", unquoted_audio)
+                    clauses, clean_audio, _ = parse_audio_target(raw_path)
                     result.audios.append(
                         AudioReference(
                             channel=channel,
@@ -869,6 +983,9 @@ class RpyParser:
                                 source_snippet=line.raw_text.strip(),
                             ),
                             kind=ReferenceKind.STATIC,
+                            is_quoted=True,
+                            clauses=clauses,
+                            clean_target=clean_audio,
                         )
                     )
                     continue
@@ -878,6 +995,7 @@ class RpyParser:
                     action = m_audio_dyn.group(1)
                     channel = m_audio_dyn.group(2)
                     dyn_target = m_audio_dyn.group(3)
+                    clauses, clean_dyn, _ = parse_audio_target(dyn_target)
                     result.audios.append(
                         AudioReference(
                             channel=channel,
@@ -890,6 +1008,9 @@ class RpyParser:
                                 source_snippet=line.raw_text.strip(),
                             ),
                             kind=ReferenceKind.DYNAMIC,
+                            is_quoted=False,
+                            clauses=clauses,
+                            clean_target=clean_dyn,
                         )
                     )
                     continue
@@ -897,8 +1018,7 @@ class RpyParser:
                 m_voice_q = RE_VOICE_QUOTED.match(code)
                 if m_voice_q:
                     raw_path = m_voice_q.group(1)
-                    unquoted_voice = unquote_string(raw_path) or raw_path
-                    clean_voice = RE_AUDIO_CLAUSE.sub("", unquoted_voice)
+                    clauses, clean_voice, _ = parse_audio_target(raw_path)
                     result.audios.append(
                         AudioReference(
                             channel="voice",
@@ -911,6 +1031,9 @@ class RpyParser:
                                 source_snippet=line.raw_text.strip(),
                             ),
                             kind=ReferenceKind.STATIC,
+                            is_quoted=True,
+                            clauses=clauses,
+                            clean_target=clean_voice,
                         )
                     )
                     continue
@@ -918,6 +1041,7 @@ class RpyParser:
                 m_voice_dyn = RE_VOICE_DYNAMIC.match(code)
                 if m_voice_dyn:
                     dyn_target = m_voice_dyn.group(1)
+                    clauses, clean_voice, _ = parse_audio_target(dyn_target)
                     result.audios.append(
                         AudioReference(
                             channel="voice",
@@ -930,6 +1054,9 @@ class RpyParser:
                                 source_snippet=line.raw_text.strip(),
                             ),
                             kind=ReferenceKind.DYNAMIC,
+                            is_quoted=False,
+                            clauses=clauses,
+                            clean_target=clean_voice,
                         )
                     )
                     continue
@@ -1039,13 +1166,14 @@ class RpyParser:
                     )
                 )
 
-        # Finalize any pending menu block at end of file
-        if active_menu_indent is not None and active_menu_location is not None:
+        # Finalize any pending menu blocks at end of file
+        while menu_stack:
+            popped = menu_stack.pop()
             result.menus.append(
                 MenuBlock(
-                    location=active_menu_location,
-                    item_count=active_menu_item_count,
-                    scope_label=current_global_label,
+                    location=popped["location"],
+                    item_count=popped["item_count"],
+                    scope_label=popped["scope_label"],
                 )
             )
 
@@ -1057,3 +1185,24 @@ class RpyParser:
                 end_line=last_python_line_num or active_python_block.location.line_number,
             )
             result.python_blocks.append(completed_block)
+            _finalize_python_block_actions(active_python_block, active_python_lines)
+            active_python_block = None
+            active_python_lines = []
+
+        # Finalize any pending multi-line action at end of file
+        if pending_action_lines:
+            full_expr = "\n".join(al.raw_text for al in pending_action_lines)
+            actions, _ = extract_actions_from_ast(full_expr, mode="eval")
+            if not actions:
+                actions, _ = extract_actions_from_ast(full_expr, mode="exec")
+            for act in actions:
+                max_idx = len(pending_action_lines) - 1
+                src_l = pending_action_lines[min(act.line_offset, max_idx)]
+                loc = Location(
+                    file_path=src_l.file_path,
+                    line_number=src_l.line_number,
+                    column_number=src_l.column + act.column_offset,
+                    source_snippet=src_l.raw_text.strip(),
+                )
+                _record_action(act, loc)
+            pending_action_lines = []

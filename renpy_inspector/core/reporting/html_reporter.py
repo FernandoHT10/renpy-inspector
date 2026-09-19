@@ -3,8 +3,9 @@
 import html
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Sequence, Union
+from typing import Optional, Sequence, Union
 
+from renpy_inspector.core.models.analysis import AnalysisResult, AnalysisStatus
 from renpy_inspector.core.models.enums import Severity
 from renpy_inspector.core.models.issue import Issue
 from renpy_inspector.core.models.project import RenPyProject
@@ -313,18 +314,32 @@ class HtmlReporter:
     @classmethod
     def generate_html(
         cls,
-        project: RenPyProject,
-        issues: Sequence[Issue],
+        project: Optional[RenPyProject] = None,
+        issues: Optional[Sequence[Issue]] = None,
         scan_duration_seconds: float = 0.0,
+        *,
+        analysis_result: Optional[AnalysisResult] = None,
     ) -> str:
         """Render complete self-contained HTML report string."""
-        critical_c = sum(1 for i in issues if i.severity == Severity.CRITICAL)
-        error_c = sum(1 for i in issues if i.severity == Severity.ERROR)
-        warning_c = sum(1 for i in issues if i.severity == Severity.WARNING)
-        info_c = sum(1 for i in issues if i.severity == Severity.INFO)
+        if analysis_result is not None:
+            eff_project = analysis_result.project or project
+            eff_issues = analysis_result.issues
+            eff_duration = analysis_result.scan_duration_seconds
+        else:
+            eff_project = project
+            eff_issues = tuple(issues or ())
+            eff_duration = scan_duration_seconds
+
+        proj_name = eff_project.name if eff_project else "Unknown Project"
+        proj_path = str(eff_project.root_path) if eff_project else ""
+
+        critical_c = sum(1 for i in eff_issues if i.severity == Severity.CRITICAL)
+        error_c = sum(1 for i in eff_issues if i.severity == Severity.ERROR)
+        warning_c = sum(1 for i in eff_issues if i.severity == Severity.WARNING)
+        info_c = sum(1 for i in eff_issues if i.severity == Severity.INFO)
 
         issue_items = []
-        for it in issues:
+        for it in eff_issues:
             loc = it.location
             loc_str = str(loc)
             sev = html.escape(it.severity.value)
@@ -355,22 +370,72 @@ class HtmlReporter:
             """
             issue_items.append(card)
 
+        banner_html = ""
+        diag_html = ""
+        if analysis_result is not None:
+            if analysis_result.status != AnalysisStatus.COMPLETE:
+                st_val = html.escape(analysis_result.status.value)
+                banner_html = f"""
+                <div style="background: #451a03; border: 1px solid #f59e0b; color: #fef3c7;
+                            padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                  <h3 style="color: #fbbf24; margin-bottom: 0.5rem;">
+                    ⚠️ Warning: Analysis Status is {st_val}
+                  </h3>
+                  <p>
+                    Inspection could not cover 100% of the project.
+                    Undetected issues may exist in unanalyzed files or unexecuted rules.
+                  </p>
+                </div>
+                """
+
+            if analysis_result.diagnostics:
+                diags_rendered = "".join(
+                    f"<li><strong>[{d.level.value} - {d.source.upper()}]</strong> "
+                    f"{html.escape(d.message)}</li>"
+                    for d in analysis_result.diagnostics
+                )
+                diag_html = f"""
+                <details style="margin-top: 2rem; padding: 1rem; background: #1e293b;
+                                border: 1px solid #334155; border-radius: 8px;">
+                  <summary style="cursor: pointer; font-weight: bold; color: #38bdf8;">
+                    Inspection Diagnostics ({len(analysis_result.diagnostics)})
+                  </summary>
+                  <ul style="margin-top: 0.75rem; padding-left: 1.5rem;
+                             color: #cbd5e1; line-height: 1.7;">
+                    {diags_rendered}
+                  </ul>
+                </details>
+                """
+
         if issue_items:
-            issues_html = "\n".join(issue_items)
+            issues_html = banner_html + "\n".join(issue_items) + diag_html
         else:
-            issues_html = (
-                '<div class="empty-state"><h2>No issues found</h2>'
-                '<p>Great job! The project passed inspection without any detected problems.</p>'
-                '</div>'
-            )
+            if analysis_result is not None and analysis_result.status != AnalysisStatus.COMPLETE:
+                st_val = html.escape(analysis_result.status.value)
+                issues_html = f"""
+                {banner_html}
+                <div class="empty-state"><h2>0 issues detected ({st_val})</h2>
+                <p>Zero issues were detected by executed rules, but the inspection status is
+                <strong>{st_val}</strong>. Uninspected code or failed rules may harbor
+                undetected defects.</p>
+                </div>
+                {diag_html}
+                """
+            else:
+                issues_html = (
+                    '<div class="empty-state"><h2>No issues found</h2>'
+                    '<p>Great job! The project passed inspection without any detected problems.</p>'
+                    '</div>'
+                    + diag_html
+                )
 
         gen_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         content = HTML_TEMPLATE
-        content = content.replace("__PROJECT_NAME__", html.escape(project.name))
-        content = content.replace("__PROJECT_PATH__", html.escape(str(project.root_path)))
+        content = content.replace("__PROJECT_NAME__", html.escape(proj_name))
+        content = content.replace("__PROJECT_PATH__", html.escape(proj_path))
         content = content.replace("__GENERATED_AT__", gen_time)
-        content = content.replace("__DURATION__", f"{scan_duration_seconds:.2f}")
-        content = content.replace("__TOTAL_ISSUES__", str(len(issues)))
+        content = content.replace("__DURATION__", f"{eff_duration:.2f}")
+        content = content.replace("__TOTAL_ISSUES__", str(len(eff_issues)))
         content = content.replace("__CRITICAL_ISSUES__", str(critical_c))
         content = content.replace("__ERROR_ISSUES__", str(error_c))
         content = content.replace("__WARNING_ISSUES__", str(warning_c))
@@ -383,9 +448,11 @@ class HtmlReporter:
     def export(
         cls,
         output_path: Union[str, Path],
-        project: RenPyProject,
-        issues: Sequence[Issue],
+        project: Optional[RenPyProject] = None,
+        issues: Optional[Sequence[Issue]] = None,
         scan_duration_seconds: float = 0.0,
+        *,
+        analysis_result: Optional[AnalysisResult] = None,
     ) -> Path:
         """Write the HTML report to disk."""
         target = Path(output_path).resolve()
@@ -395,6 +462,7 @@ class HtmlReporter:
             project=project,
             issues=issues,
             scan_duration_seconds=scan_duration_seconds,
+            analysis_result=analysis_result,
         )
 
         with open(target, "w", encoding="utf-8") as f:

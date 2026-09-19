@@ -1,9 +1,9 @@
-"""Orchestrates parsing of all script files within a Ren'Py project."""
-
+import traceback
 from pathlib import Path
 from typing import Callable, Optional, Sequence, Union
 
 from renpy_inspector.core.models.enums import AssetType
+from renpy_inspector.core.models.failures import ParseFailure
 from renpy_inspector.core.parser.result import ParsedProject
 from renpy_inspector.core.parser.rpy_parser import RpyParser
 from renpy_inspector.core.scanner.asset_catalog import AssetCatalog
@@ -21,6 +21,7 @@ class ProjectParser:
         game_directory: Union[str, Path],
         catalog: Optional[AssetCatalog] = None,
         progress_callback: Optional[Callable[[str, int, int], None]] = None,
+        is_cancelled: Optional[Callable[[], bool]] = None,
     ) -> ParsedProject:
         """Parse all script files (.rpy and .rpym) in the game directory.
 
@@ -28,6 +29,7 @@ class ProjectParser:
             game_directory: Absolute or relative path to the 'game/' directory.
             catalog: Optional pre-scanned AssetCatalog. If not provided, a FileScanner runs first.
             progress_callback: Optional callback receiving (rel_path, current_index, total_count).
+            is_cancelled: Optional callback returning True if parsing should abort.
 
         Returns:
             ParsedProject containing all parsed file results and aggregated metrics.
@@ -37,7 +39,7 @@ class ProjectParser:
 
         if catalog is None:
             scanner = FileScanner()
-            catalog = scanner.scan(game_path)
+            catalog = scanner.scan(game_path, is_cancelled=is_cancelled)
 
         # Filter strictly for scripts (.rpy, .rpym), explicitly excluding .rpyc
         script_assets = [
@@ -48,6 +50,9 @@ class ProjectParser:
         total_scripts = len(script_assets)
 
         for idx, asset in enumerate(script_assets, start=1):
+            if is_cancelled and is_cancelled():
+                break
+
             rel_path = asset.relative_path
             abs_path = asset.absolute_path
 
@@ -60,8 +65,19 @@ class ProjectParser:
                     display_path=rel_path,
                 )
                 parsed_project.files[rel_path] = file_result
-            except Exception:
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception as exc:
+                clean_tb = traceback.format_exc(limit=5)
                 parsed_project.failed_files.append(rel_path)
+                parsed_project.failures.append(
+                    ParseFailure(
+                        file_path=rel_path,
+                        error_type=type(exc).__name__,
+                        error_message=str(exc),
+                        traceback=clean_tb,
+                    )
+                )
 
         return parsed_project
 
@@ -89,7 +105,18 @@ class ProjectParser:
                     display_path=rel_path,
                 )
                 parsed_project.files[rel_path] = file_result
-            except Exception:
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except Exception as exc:
+                clean_tb = traceback.format_exc(limit=5)
                 parsed_project.failed_files.append(rel_path)
+                parsed_project.failures.append(
+                    ParseFailure(
+                        file_path=rel_path,
+                        error_type=type(exc).__name__,
+                        error_message=str(exc),
+                        traceback=clean_tb,
+                    )
+                )
 
         return parsed_project

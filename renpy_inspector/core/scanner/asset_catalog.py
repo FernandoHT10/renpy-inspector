@@ -5,6 +5,7 @@ from typing import Optional, Sequence
 
 from renpy_inspector.core.models.asset import AssetInfo
 from renpy_inspector.core.models.enums import AssetType
+from renpy_inspector.core.models.failures import ScanError
 
 
 def normalize_rel_path(path_str: str) -> str:
@@ -19,6 +20,8 @@ class AssetCatalog:
         self._assets_by_exact_path: dict[str, AssetInfo] = {}
         self._assets_by_folded_path: dict[str, list[AssetInfo]] = defaultdict(list)
         self._assets_by_type: dict[AssetType, list[AssetInfo]] = defaultdict(list)
+        self.scan_errors: list[ScanError] = []
+        self.compiled_scripts_count: int = 0
 
         if assets:
             for asset in assets:

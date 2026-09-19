@@ -2,7 +2,7 @@
 
 from typing import List
 
-from renpy_inspector.core.engine.context import BUILTIN_RENPY_LABELS, ProjectContext
+from renpy_inspector.core.engine.context import ProjectContext
 from renpy_inspector.core.models.enums import Category, Severity
 from renpy_inspector.core.models.issue import Issue
 from renpy_inspector.core.rules.base import Rule
@@ -30,9 +30,9 @@ class UnusedLabelRule(Rule):
         targeted = jump_targets | call_targets
 
         for name, label_list in context.labels_by_name.items():
-            # Skip builtins, private labels, local sub-labels, and inline named menus
+            # Skip lifecycle hooks, private labels, local sub-labels, and inline named menus
             if (
-                name in BUILTIN_RENPY_LABELS
+                name in context.lifecycle_hook_labels
                 or name.startswith("_")
                 or name.startswith(".")
                 or all(lbl.is_menu for lbl in label_list)

@@ -3,7 +3,7 @@
 from renpy_inspector.core.engine.context import ProjectContext
 from renpy_inspector.core.models.enums import Category, Severity
 from renpy_inspector.core.models.issue import Issue
-from renpy_inspector.core.models.symbols import ReferenceKind
+from renpy_inspector.core.models.resolution import ResolutionStatus
 from renpy_inspector.core.rules.base import BaseRule
 
 
@@ -33,7 +33,7 @@ class CaseMismatchRule(BaseRule):
                 msg = (
                     f"Case mismatch for image '{img.name}': referenced as "
                     f"'{img.asset_reference}', but file on disk is '{mismatch}'. "
-                    "Will cause crashes on Linux and Android."
+                    "Reference may fail on case-sensitive filesystems (Linux, Steam Deck, Android)."
                 )
                 issues.append(
                     self.create_issue(
@@ -44,31 +44,25 @@ class CaseMismatchRule(BaseRule):
                     )
                 )
 
-        # 2. Check audio references
+        # 2. Check audio references via unified resolver
         for audio in context.all_audios:
-            if audio.kind == ReferenceKind.DYNAMIC:
-                continue
-
-            target = audio.target.strip("\"'").replace("\\", "/")
-            if not target:
-                continue
-
-            mismatch = context.catalog.has_case_mismatch(target)
-            if not mismatch and not context.catalog.find_exact(target):
-                mismatch = context.catalog.has_case_mismatch(f"audio/{target}")
-
-            if mismatch:
+            res = context.resolve_audio(audio)
+            if res.status == ResolutionStatus.CASE_MISMATCH and res.matched_path:
                 msg = (
-                    f"Case mismatch for audio file: referenced as '{target}', "
-                    f"but file on disk is '{mismatch}'. "
-                    "Will cause crashes on Linux and Android."
+                    f"Case mismatch for audio file: referenced as '{audio.clean_target}', "
+                    f"but file on disk is '{res.matched_path}'. "
+                    "Reference may fail on case-sensitive filesystems (Linux, Steam Deck, Android)."
                 )
                 issues.append(
                     self.create_issue(
                         message=msg,
                         location=audio.location,
-                        suggestion=f"Update reference to match disk casing '{mismatch}'.",
-                        metadata={"referenced": target, "actual": mismatch},
+                        suggestion=f"Update reference to match disk casing '{res.matched_path}'.",
+                        metadata={
+                            "referenced": audio.clean_target,
+                            "actual": res.matched_path,
+                            "raw_target": audio.target,
+                        },
                     )
                 )
 

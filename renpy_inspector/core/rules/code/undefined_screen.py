@@ -31,7 +31,10 @@ class UndefinedScreenRule(Rule):
             if not screen_name:
                 continue
 
-            if screen_name not in context.defined_screens:
+            if (
+                screen_name not in context.defined_screens
+                and screen_name not in context.engine_common_screens
+            ):
                 is_hide = call.screen_action == "hide"
                 severity = Severity.WARNING if is_hide else Severity.ERROR
                 action_desc = (

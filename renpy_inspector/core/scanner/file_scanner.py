@@ -6,6 +6,7 @@ from typing import Callable, Optional, Set
 
 from renpy_inspector.core.models.asset import AssetInfo
 from renpy_inspector.core.models.enums import AssetType
+from renpy_inspector.core.models.failures import ScanError
 from renpy_inspector.core.scanner.asset_catalog import AssetCatalog
 
 # Extension sets mapped to AssetType (based on official Ren'Py documentation)
@@ -50,11 +51,16 @@ class FileScanner:
         self.ignored_dirs = set(ignored_dirs) if ignored_dirs is not None else IGNORED_DIRS
         self.progress_callback = progress_callback
 
-    def scan(self, game_directory: Path) -> AssetCatalog:
+    def scan(
+        self,
+        game_directory: Path,
+        is_cancelled: Optional[Callable[[], bool]] = None,
+    ) -> AssetCatalog:
         """Scan the game directory and populate an AssetCatalog with discovered assets.
 
         Args:
             game_directory: Absolute Path to the 'game/' folder of the project.
+            is_cancelled: Optional callback returning True if scan should abort.
 
         Returns:
             An AssetCatalog containing all categorized assets.
@@ -69,6 +75,9 @@ class FileScanner:
         dir_stack = [resolved_game_dir]
 
         while dir_stack:
+            if is_cancelled and is_cancelled():
+                break
+
             current_dir = dir_stack.pop()
 
             try:
@@ -81,6 +90,9 @@ class FileScanner:
                     }
 
                     for entry in entry_list:
+                        if is_cancelled and is_cancelled():
+                            break
+
                         try:
                             if entry.is_dir(follow_symlinks=False):
                                 if entry.name.lower() not in self.ignored_dirs:
@@ -88,6 +100,9 @@ class FileScanner:
                             elif entry.is_file(follow_symlinks=False):
                                 ext = Path(entry.name).suffix.lower()
                                 lower_name = entry.name.lower()
+
+                                if lower_name.endswith(".rpyc"):
+                                    catalog.compiled_scripts_count += 1
 
                                 if lower_name.endswith("_ren.py"):
                                     asset_type = AssetType.SCRIPT
@@ -115,10 +130,34 @@ class FileScanner:
 
                                     if self.progress_callback:
                                         self.progress_callback(rel_path)
-                        except (OSError, PermissionError):
-                            # Skip unreadable individual files or directories safely
-                            continue
-            except (OSError, PermissionError):
-                continue
+                        except (KeyboardInterrupt, SystemExit):
+                            raise
+                        except (OSError, PermissionError) as exc:
+                            is_d = False
+                            try:
+                                is_d = entry.is_dir(follow_symlinks=False)
+                            except Exception:
+                                pass
+                            catalog.scan_errors.append(
+                                ScanError(
+                                    path=str(entry.path),
+                                    operation="stat",
+                                    error_type=type(exc).__name__,
+                                    error_message=str(exc),
+                                    is_directory=is_d,
+                                )
+                            )
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except (OSError, PermissionError) as exc:
+                catalog.scan_errors.append(
+                    ScanError(
+                        path=str(current_dir),
+                        operation="scandir",
+                        error_type=type(exc).__name__,
+                        error_message=str(exc),
+                        is_directory=True,
+                    )
+                )
 
         return catalog

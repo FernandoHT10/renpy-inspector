@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Any, Optional
 
 from renpy_inspector.core.models.location import Location
+from renpy_inspector.core.models.resolution import parse_audio_target
 
 
 class ReferenceKind(str, Enum):
@@ -181,6 +182,16 @@ class AudioReference:
     location: Location
     action: str = "play"  # "play" or "queue"
     kind: ReferenceKind = ReferenceKind.STATIC
+    is_quoted: bool = True
+    clauses: tuple[str, ...] = ()
+    clean_target: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.clean_target:
+            parsed_clauses, cleaned, _ = parse_audio_target(self.target)
+            object.__setattr__(self, "clean_target", cleaned)
+            if not self.clauses:
+                object.__setattr__(self, "clauses", parsed_clauses)
 
     @property
     def is_dynamic(self) -> bool:
@@ -190,6 +201,9 @@ class AudioReference:
         return {
             "channel": self.channel,
             "target": self.target,
+            "clean_target": self.clean_target,
+            "is_quoted": self.is_quoted,
+            "clauses": list(self.clauses),
             "location": self.location.to_dict(),
             "action": self.action,
             "kind": self.kind.value,

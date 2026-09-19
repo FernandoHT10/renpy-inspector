@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from renpy_inspector.core.models.failures import ParseFailure
 from renpy_inspector.core.models.symbols import (
     AudioReference,
     CallReference,
@@ -93,6 +94,7 @@ class ParsedProject:
 
     files: dict[str, FileParseResult] = field(default_factory=dict)
     failed_files: list[str] = field(default_factory=list)
+    failures: list[ParseFailure] = field(default_factory=list)
 
     @property
     def total_files_parsed(self) -> int:

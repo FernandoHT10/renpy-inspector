@@ -12,15 +12,39 @@ class RuleRegistry:
         self._rules: dict[str, BaseRule] = {}
         self._enabled: dict[str, bool] = {}
 
-    def register(self, rule: BaseRule, enabled: bool = True) -> None:
-        """Add a rule to the registry."""
-        self._rules[rule.rule_id] = rule
-        self._enabled[rule.rule_id] = enabled
+    def register(
+        self,
+        rule: BaseRule,
+        enabled: bool = True,
+        allow_override: bool = False,
+    ) -> None:
+        """Add a rule to the registry.
+
+        Raises:
+            ValueError: If a rule with the same ID is already registered and
+                allow_override is False.
+        """
+        rule_id = getattr(rule, "rule_id", rule.__class__.__name__)
+        if rule_id in self._rules and not allow_override:
+            raise ValueError(
+                f"Rule with ID '{rule_id}' is already registered. "
+                "Set allow_override=True to explicitly replace it."
+            )
+        self._rules[rule_id] = rule
+        self._enabled[rule_id] = enabled
 
     def set_enabled(self, rule_id: str, enabled: bool) -> None:
-        """Enable or disable a specific rule by ID."""
-        if rule_id in self._rules:
-            self._enabled[rule_id] = enabled
+        """Enable or disable a specific rule by ID.
+
+        Raises:
+            KeyError: If rule_id is not present in registered rules.
+        """
+        if rule_id not in self._rules:
+            raise KeyError(
+                f"Cannot configure unknown rule ID '{rule_id}'. "
+                f"Registered rules: {list(self._rules.keys())}"
+            )
+        self._enabled[rule_id] = enabled
 
     def is_enabled(self, rule_id: str) -> bool:
         """Check whether a rule is currently enabled."""
@@ -50,3 +74,8 @@ class RuleRegistry:
         for rule in get_default_rules():
             registry.register(rule, enabled=True)
         return registry
+
+    @classmethod
+    def default(cls) -> "RuleRegistry":
+        """Alias for create_default."""
+        return cls.create_default()

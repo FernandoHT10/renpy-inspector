@@ -3,7 +3,7 @@
 from renpy_inspector.core.engine.context import ProjectContext
 from renpy_inspector.core.models.enums import Category, Severity
 from renpy_inspector.core.models.issue import Issue
-from renpy_inspector.core.models.symbols import ReferenceKind
+from renpy_inspector.core.models.resolution import ResolutionStatus
 from renpy_inspector.core.rules.base import BaseRule
 
 
@@ -20,25 +20,54 @@ class MissingAudioRule(BaseRule):
         issues: list[Issue] = []
 
         for audio in context.all_audios:
-            # Skip dynamic audio variables or audio namespace references
-            if audio.kind == ReferenceKind.DYNAMIC:
+            # Skip dynamic string interpolation patterns (e.g. "[current_track]")
+            clean = audio.clean_target
+            if not clean or ("[" in clean and "]" in clean):
                 continue
 
-            target = audio.target.strip("\"'").replace("\\", "/")
-            if not target or ("[" in target and "]" in target):
+            res = context.resolve_audio(audio)
+
+            # Valid references (exact disk file or canonical audio namespace symbol)
+            if res.status in (
+                ResolutionStatus.EXACT,
+                ResolutionStatus.AUDIO_NAMESPACE,
+                ResolutionStatus.CASE_MISMATCH,
+                ResolutionStatus.DYNAMIC,
+            ):
                 continue
 
-            asset = context.resolve_audio_asset(target)
-            if asset is None:
+            if res.status == ResolutionStatus.AMBIGUOUS:
                 msg = (
-                    f"Audio file '{target}' (channel: {audio.channel}) "
+                    f"Audio reference '{clean}' (channel: {audio.channel}) "
+                    "is ambiguous and matches multiple files on disk."
+                )
+                issues.append(
+                    self.create_issue(
+                        message=msg,
+                        location=audio.location,
+                        suggestion=res.suggestion or "Disambiguate reference path.",
+                        severity=Severity.WARNING,
+                        metadata={
+                            "target": clean,
+                            "raw_target": audio.target,
+                            "channel": audio.channel,
+                            "action": audio.action,
+                            "is_quoted": audio.is_quoted,
+                        },
+                    )
+                )
+            elif res.status == ResolutionStatus.MISSING:
+                msg = (
+                    f"Audio file '{clean}' (channel: {audio.channel}) "
                     "was not found in 'game/' or 'game/audio/'."
                 )
-                sug = f"Verify path or place '{target}' in 'game/audio/'."
+                sug = res.suggestion or f"Verify path or place '{clean}' in 'game/audio/'."
                 meta = {
-                    "target": target,
+                    "target": clean,
+                    "raw_target": audio.target,
                     "channel": audio.channel,
                     "action": audio.action,
+                    "is_quoted": audio.is_quoted,
                 }
                 issues.append(
                     self.create_issue(

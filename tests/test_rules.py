@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from renpy_inspector.core.engine.context import ProjectContext
 from renpy_inspector.core.engine.registry import RuleRegistry
 from renpy_inspector.core.engine.runner import RuleRunner
@@ -17,6 +19,7 @@ from renpy_inspector.core.rules.assets.missing_audio import MissingAudioRule
 from renpy_inspector.core.rules.assets.missing_font import MissingFontRule
 from renpy_inspector.core.rules.assets.missing_image import MissingImageRule
 from renpy_inspector.core.rules.assets.unused_asset import UnusedAssetCandidateRule
+from renpy_inspector.core.rules.base import BaseRule
 from renpy_inspector.core.rules.code.broken_call import BrokenCallRule
 from renpy_inspector.core.rules.code.broken_jump import BrokenJumpRule
 from renpy_inspector.core.rules.code.conflicting_define_default import (
@@ -240,22 +243,20 @@ def test_case_mismatch_rule():
     ])
 
     proj = RenPyProject(name="Test", root_path=Path("/tmp"), game_path=Path("/tmp/game"))
-    parser = ProjectParser()
-    parsed_proj = parser.parse_files([], Path("/tmp/game"))
-
-    ctx = ProjectContext.build(proj, catalog, parsed_proj)
-
-    # Inject mismatched references
-    from renpy_inspector.core.models.location import Location
-    from renpy_inspector.core.models.symbols import AudioReference, ImageDefinition
-
     loc = Location(file_path="game/script.rpy", line_number=5)
-    ctx.all_images.append(
-        ImageDefinition(name="bg room", location=loc, asset_reference="images/ROOM.png")
+    from renpy_inspector.core.models.symbols import ImageDefinition
+
+    file_result = FileParseResult(
+        file_path="game/script.rpy",
+        images=[
+            ImageDefinition(name="bg room", location=loc, asset_reference="images/ROOM.png")
+        ],
+        audios=[
+            AudioReference(channel="music", target="audio/THEME.ogg", location=loc)
+        ],
     )
-    ctx.all_audios.append(
-        AudioReference(channel="music", target="audio/THEME.ogg", location=loc)
-    )
+    parsed_proj = ParsedProject(files={"game/script.rpy": file_result})
+    ctx = ProjectContext.build(proj, catalog, parsed_proj)
 
     rule = CaseMismatchRule()
     issues = rule.analyze(ctx)
@@ -349,8 +350,12 @@ label start:
     # Test disabling BrokenJumpRule
     registry.set_enabled("RPY-CODE-001", False)
     runner = RuleRunner(registry=registry)
-    issues = runner.run(ctx)
-    assert not any(i.rule_id == "RPY-CODE-001" for i in issues)
+    result = runner.run(ctx)
+    assert not any(i.rule_id == "RPY-CODE-001" for i in result.issues)
+    assert result.is_complete
+    assert not result.has_failures
+    assert isinstance(result.issues, tuple)
+    assert isinstance(result.failures, tuple)
 
     # Re-enable
     registry.set_enabled("RPY-CODE-001", True)
@@ -359,9 +364,152 @@ label start:
     def progress(title, idx, total):
         progress_reported.append((title, idx, total))
 
-    issues2 = runner.run(ctx, progress_callback=progress)
-    assert any(i.rule_id == "RPY-CODE-001" for i in issues2)
+    result2 = runner.run(ctx, progress_callback=progress)
+    assert any(i.rule_id == "RPY-CODE-001" for i in result2.issues)
     assert len(progress_reported) == len(registry.get_all_rules())
+    assert result2.is_complete
+    assert not result2.has_failures
+
+
+class CrashingRule(BaseRule):
+    """Test rule that raises an unhandled exception during analyze()."""
+
+    rule_id = "TEST-CRASH-001"
+    title = "Crashing Test Rule"
+    category = Category.CODE
+    default_severity = Severity.ERROR
+    description = "A rule that crashes intentionally for testing."
+
+    def analyze(self, context):
+        raise RuntimeError("Simulated rule crash!")
+
+
+class GeneratorCrashingRule(BaseRule):
+    """Test rule that raises an unhandled exception during generator iteration."""
+
+    rule_id = "TEST-GEN-CRASH-001"
+    title = "Generator Crashing Rule"
+    category = Category.CODE
+    default_severity = Severity.ERROR
+    description = "A rule that crashes midway through generator iteration."
+
+    def analyze(self, context):
+        yield self.create_issue(
+            message="First valid issue before crash",
+            location=Location("test.rpy", 1),
+            suggestion="Fix it",
+        )
+        raise ValueError("Crash during generator iteration!")
+
+
+class RuleWithoutIdOrTitle:
+    """Test rule that omits rule_id and title attributes."""
+
+    category = Category.CODE
+    default_severity = Severity.ERROR
+
+    def analyze(self, context):
+        raise TypeError("Crash from rule without id or title")
+
+
+def test_rule_runner_records_rule_failure(tmp_path: Path):
+    """RuleRunner must catch exceptions, record RuleFailure, and continue running other rules."""
+    scripts = {"script.rpy": "label start:\n    return\n"}
+    ctx = create_test_context(tmp_path, scripts)
+
+    registry = RuleRegistry()
+    registry.register(CrashingRule())
+    registry.register(BrokenJumpRule())
+
+    runner = RuleRunner(registry=registry)
+    result = runner.run(ctx)
+
+    assert result.has_failures
+    assert not result.is_complete
+    assert len(result.failures) == 1
+    assert result.total_rules_count == 2
+    assert result.executed_rules_count == 1  # BrokenJumpRule executed
+
+    failure = result.failures[0]
+    assert failure.rule_id == "TEST-CRASH-001"
+    assert failure.rule_title == "Crashing Test Rule"
+    assert failure.error_type == "RuntimeError"
+    assert "Simulated rule crash!" in failure.error_message
+    assert "RuntimeError" in failure.traceback
+    assert isinstance(result.issues, tuple)
+    assert isinstance(result.failures, tuple)
+
+
+def test_rule_runner_failure_during_generator_iteration(tmp_path: Path):
+    """If a rule returns a generator that crashes during iteration, it must record failure."""
+    scripts = {"script.rpy": "label start:\n    return\n"}
+    ctx = create_test_context(tmp_path, scripts)
+
+    registry = RuleRegistry()
+    registry.register(GeneratorCrashingRule())
+
+    runner = RuleRunner(registry=registry)
+    result = runner.run(ctx)
+
+    assert result.has_failures
+    assert not result.is_complete
+    assert result.executed_rules_count == 0  # Did not complete iteration successfully
+    assert len(result.failures) == 1
+    assert result.failures[0].error_type == "ValueError"
+    assert "Crash during generator iteration!" in result.failures[0].error_message
+
+
+def test_rule_runner_fail_fast_reraises(tmp_path: Path):
+    """With fail_fast=True, RuleRunner must immediately re-raise the unhandled exception."""
+    scripts = {"script.rpy": "label start:\n    return\n"}
+    ctx = create_test_context(tmp_path, scripts)
+
+    registry = RuleRegistry()
+    registry.register(CrashingRule())
+
+    runner = RuleRunner(registry=registry)
+    with pytest.raises(RuntimeError, match="Simulated rule crash!"):
+        runner.run(ctx, fail_fast=True)
+
+
+def test_rule_runner_base_exceptions_propagate(tmp_path: Path):
+    """BaseExceptions such as KeyboardInterrupt must not be intercepted by RuleRunner."""
+    scripts = {"script.rpy": "label start:\n    return\n"}
+    ctx = create_test_context(tmp_path, scripts)
+
+    class KeyboardInterruptRule(BaseRule):
+        rule_id = "TEST-INT-001"
+        title = "Interrupt Rule"
+        category = Category.CODE
+        default_severity = Severity.ERROR
+        description = "Raises KeyboardInterrupt."
+
+        def analyze(self, context):
+            raise KeyboardInterrupt("Simulated user interrupt")
+
+    registry = RuleRegistry()
+    registry.register(KeyboardInterruptRule())
+
+    runner = RuleRunner(registry=registry)
+    with pytest.raises(KeyboardInterrupt):
+        runner.run(ctx)
+
+
+def test_rule_without_id_or_title_uses_class_fallback(tmp_path: Path):
+    """Rules omitting rule_id or title must fallback to rule.__class__.__name__ without error."""
+    scripts = {"script.rpy": "label start:\n    return\n"}
+    ctx = create_test_context(tmp_path, scripts)
+
+    registry = RuleRegistry()
+    registry.register(RuleWithoutIdOrTitle())  # type: ignore
+
+    runner = RuleRunner(registry=registry)
+    result = runner.run(ctx)
+
+    assert result.has_failures
+    assert result.failures[0].rule_id == "RuleWithoutIdOrTitle"
+    assert result.failures[0].rule_title == "RuleWithoutIdOrTitle"
+    assert result.failures[0].error_type == "TypeError"
 
 
 def test_unused_asset_candidate_rule_skipped_when_no_scripts(tmp_path: Path):
@@ -673,12 +821,13 @@ label unused_story:
     assert not any("intro_tutorial" in name for name in unused_names)
 
 
-def test_audio_stem_and_subdirectory_resolution(tmp_path: Path):
+def test_audio_namespace_and_subdirectory_resolution(tmp_path: Path):
     scripts = {
         "audio_test.rpy": """
 label start:
-    play sound "cum_01"
-    play music "bgm_forest.ogg"
+    play sound cum_01
+    play music bgm_forest
+    play music "bgm/nature/bgm_forest.ogg"
     play sound "missing_sfx"
 """
     }

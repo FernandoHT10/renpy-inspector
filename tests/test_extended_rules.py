@@ -64,7 +64,7 @@ def test_undefined_screen_rule():
             ScreenDefinition(name="custom_ui", location=loc),
         ],
         calls=[
-            CallReference(target="preferences", location=loc, is_screen=True),  # Builtin screen
+            CallReference(target="_confirm", location=loc, is_screen=True),  # Engine common screen
             CallReference(target="custom_ui", location=loc, is_screen=True),  # Defined screen
             CallReference(target="nonexistent_screen", location=loc, is_screen=True),  # Undefined
             CallReference(target="some_label", location=loc, is_screen=False),  # Normal label call
